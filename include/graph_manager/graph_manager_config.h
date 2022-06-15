@@ -12,6 +12,7 @@ T get_parameter(rclcpp::Node& node, const std::string& name, T default_value) {
   T value;
   if (!node.get_parameter(name, value)) {
     std::cerr << "Parameter " << name << " not found\n";
+    std::cout << "Parameter " << name << " not found\n";
     return default_value;
   }
   return value;

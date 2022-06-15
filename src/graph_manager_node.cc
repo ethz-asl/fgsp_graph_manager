@@ -10,6 +10,10 @@ GraphManagerNode::GraphManagerNode()
 
   odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
       config_->odom_topic, 10, std::bind(&fgsp::GraphManager::odometryCallback, manager_.get(), std::placeholders::_1));
+
+  std::cout << "Subscribing to " << config_->odom_topic << std::endl;
+
+  std::cout << "Graph Manager initialized." << std::endl;
 }
 
 int main(int argc, char** argv) {
