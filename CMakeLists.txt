@@ -35,10 +35,10 @@ target_link_libraries(graph_manager_node graph_manager ${Boost_LIBRARIES} gtsam)
 ament_target_dependencies(graph_manager_node rclcpp geometry_msgs nav_msgs sensor_msgs message_filters)
 
 install(TARGETS
-  TARGETS graph_manager_node graph_manager
+  TARGETS graph_manager_node
   LIBRARY DESTINATION lib/${PROJECT_NAME}
   ARCHIVE DESTINATION lib/${PROJECT_NAME}
-  RUNTIME DESTINATION bin/${PROJECT_NAME}
+  RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 
 install(

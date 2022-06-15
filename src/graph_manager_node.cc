@@ -1,4 +1,5 @@
 #include "graph_manager/graph_manager_node.h"
+#include <functional>
 
 GraphManagerNode::GraphManagerNode()
     : rclcpp::Node("graph_manager") {
@@ -6,6 +7,9 @@ GraphManagerNode::GraphManagerNode()
 
   config_.reset(fgsp::GraphManagerConfig::init(*this));
   manager_ = std::make_unique<fgsp::GraphManager>(*config_);
+
+  odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
+      config_->odom_topic, 10, std::bind(&fgsp::GraphManager::odometryCallback, manager_.get(), std::placeholders::_1));
 }
 
 int main(int argc, char** argv) {

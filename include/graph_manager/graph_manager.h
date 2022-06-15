@@ -10,9 +10,9 @@
 // #include <message_filters/sync_policies/exact_time.h>
 // #include <message_filters/synchronizer.h>
 #include <geometry_msgs/msg/pose_with_covariance_stamped.h>
-#include <nav_msgs/msg/odometry.h>
-#include <nav_msgs/msg/path.h>
-#include <sensor_msgs/msg/point_cloud2.h>
+#include <nav_msgs/msg/odometry.hpp>
+#include <nav_msgs/msg/path.hpp>
+#include <sensor_msgs/msg/point_cloud2.hpp>
 
 // #include "visualization_msgs/Marker.h"
 // #include "visualization_msgs/MarkerArray.h"
@@ -42,7 +42,7 @@ class GraphManager {
   //   //Callbacks
   //   void syncCallbackHandler(const nav_msgs::OdometryConstPtr& odomPtr, const OptStatusConstPtr& odomStatusPtr, const sensor_msgs::PointCloud2ConstPtr& cloudPtr);
   //   int lidarOdomCallback(const nav_msgs::Odometry::ConstPtr& odomPtr);
-  //   void lidarOdomCallbackEUROC(const nav_msgs::Odometry::ConstPtr& odomPtr);
+  void odometryCallback(nav_msgs::msg::Odometry const& odom);
   //   void cloudCallback(int key, const sensor_msgs::PointCloud2ConstPtr& cloudPtr);
   //   void absolutePoseCallback(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr& posePtr);
   //   void maplabAnchorCallback(const nav_msgs::Path::ConstPtr& pathPtr);
