@@ -2,6 +2,8 @@
 
 namespace fgsp {
 
+std::unique_ptr<GraphManagerLogger> GraphManagerLogger::instance_ = nullptr;
+
 auto GraphManagerLogger::getInstance() -> GraphManagerLogger const& {
   if (instance_ == nullptr) {
     instance_.reset(new GraphManagerLogger());
@@ -10,11 +12,11 @@ auto GraphManagerLogger::getInstance() -> GraphManagerLogger const& {
 }
 
 void GraphManagerLogger::logInfo(const std::string& msg) const {
-  std::cout << msg << "\n";
+  std::cout << "[INFO] " << msg << "\n";
 }
 
 void GraphManagerLogger::logError(const std::string& msg) const {
-  std::cerr << msg << "\n";
+  std::cerr << "[ERROR] " << msg << "\n";
 }
 
 }  // namespace fgsp

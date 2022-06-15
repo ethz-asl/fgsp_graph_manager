@@ -1,9 +1,13 @@
 #include "graph_manager/graph_manager_node.h"
+
 #include <functional>
+
+#include "graph_manager/graph_manager_logger.h"
 
 GraphManagerNode::GraphManagerNode()
     : rclcpp::Node("graph_manager") {
-  std::cout << "Initializing Graph Manager..." << std::endl;
+  auto& logger = fgsp::GraphManagerLogger::getInstance();
+  logger.logInfo("Initializing Graph Manager...");
 
   config_.reset(fgsp::GraphManagerConfig::init(*this));
   manager_ = std::make_unique<fgsp::GraphManager>(*config_);
@@ -11,9 +15,9 @@ GraphManagerNode::GraphManagerNode()
   odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
       config_->odom_topic, 10, std::bind(&fgsp::GraphManager::odometryCallback, manager_.get(), std::placeholders::_1));
 
-  std::cout << "Subscribing to " << config_->odom_topic << std::endl;
+  logger.logInfo("Subscribed input odometry to " + config_->odom_topic);
 
-  std::cout << "Graph Manager initialized." << std::endl;
+  logger.logInfo("Graph Manager initialized");
 }
 
 int main(int argc, char** argv) {

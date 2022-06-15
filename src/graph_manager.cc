@@ -1,50 +1,46 @@
 #include "graph_manager/graph_manager.h"
+
 #include <sstream>
+
+#include "graph_manager/graph_manager_logger.h"
 
 namespace fgsp {
 
-static void log_info(std::string&& msg) {
-  std::cout << msg << std::endl;
-}
-
-static void log_error(const std::string& msg) {
-  std::cerr << msg << std::endl;
-}
-
 GraphManager::GraphManager(GraphManagerConfig const& config)
     : config_(config) {
-  log_info("GraphManager - Verbosity level set to: " + std::to_string(config.verbose));
-  log_info("GraphManager - World/Global frame set to: " + config.world_frame);
-  log_info("GraphManager - Robot Map frame set to: " + config.map_frame);
-  log_info("GraphManager - Robot Base frame set to: " + config.base_frame);
+  auto& logger = GraphManagerLogger::getInstance();
+  logger.logInfo("GraphManager - Verbosity level set to: " + std::to_string(config.verbose));
+  logger.logInfo("GraphManager - World/Global frame set to: " + config.world_frame);
+  logger.logInfo("GraphManager - Robot Map frame set to: " + config.map_frame);
+  logger.logInfo("GraphManager - Robot Base frame set to: " + config.base_frame);
 
-  log_info("GraphManager - Minimum Position(m) delta Norm: " + std::to_string(config.pos_delta));
-  log_info("GraphManager - Minimum Rotation(rad) delta Norm: " + std::to_string(config.rot_delta));
+  logger.logInfo("GraphManager - Minimum Position(m) delta Norm: " + std::to_string(config.pos_delta));
+  logger.logInfo("GraphManager - Minimum Rotation(rad) delta Norm: " + std::to_string(config.rot_delta));
 
-  log_info("GraphManager - LiDAR Frame: " + config.lidar_frame);
-  log_info("GraphManager - Camera Frame: " + config.camera_frame);
-  log_info("GraphManager - IMU Frame: " + config.imu_frame);
+  logger.logInfo("GraphManager - LiDAR Frame: " + config.lidar_frame);
+  logger.logInfo("GraphManager - Camera Frame: " + config.camera_frame);
+  logger.logInfo("GraphManager - IMU Frame: " + config.imu_frame);
 
   if (config.odom_noise_std.size() != 6) {
-    log_error("GraphManager - Odometry noise std vector has wrong size: " + std::to_string(config.odom_noise_std.size()));
+    logger.logError("GraphManager - Odometry noise std vector has wrong size: " + std::to_string(config.odom_noise_std.size()));
     return;
   }
   _odomNoise << config.odom_noise_std[0], config.odom_noise_std[1], config.odom_noise_std[2], config.odom_noise_std[3], config.odom_noise_std[4], config.odom_noise_std[5];
 
   if (config.absolute_noise_std.size() != 6) {
-    log_error("GraphManager - Absolute noise std vector has wrong size: " + std::to_string(config.absolute_noise_std.size()));
+    logger.logError("GraphManager - Absolute noise std vector has wrong size: " + std::to_string(config.absolute_noise_std.size()));
     return;
   }
   _absoluteNoise << config.absolute_noise_std[0], config.absolute_noise_std[1], config.absolute_noise_std[2], config.absolute_noise_std[3], config.absolute_noise_std[4], config.absolute_noise_std[5];
 
   if (config.submap_noise_std.size() != 6) {
-    log_error("GraphManager - Absolute noise std vector has wrong size: " + std::to_string(config.submap_noise_std.size()));
+    logger.logError("GraphManager - Absolute noise std vector has wrong size: " + std::to_string(config.submap_noise_std.size()));
     return;
   }
   _submapNoise << config.submap_noise_std[0], config.submap_noise_std[1], config.submap_noise_std[2], config.submap_noise_std[3], config.submap_noise_std[4], config.submap_noise_std[5];
 
   if (config.anchor_noise_std.size() != 6) {
-    log_error("GraphManager - Absolute noise std vector has wrong size: " + std::to_string(config.anchor_noise_std.size()));
+    logger.logError("GraphManager - Absolute noise std vector has wrong size: " + std::to_string(config.anchor_noise_std.size()));
     return;
   }
   _anchorNoise << config.anchor_noise_std[0], config.anchor_noise_std[1], config.anchor_noise_std[2], config.anchor_noise_std[3], config.anchor_noise_std[4], config.anchor_noise_std[5];
@@ -55,12 +51,12 @@ GraphManager::GraphManager(GraphManagerConfig const& config)
      << "GraphManager - Absolute Factor Noise: " << _absoluteNoise.transpose().format(clean_fmt) << "\n"
      << "GraphManager - Submap Factor Noise: " << _submapNoise.transpose().format(clean_fmt) << "\n"
      << "GraphManager - Anchor Factor Noise: " << _anchorNoise.transpose().format(clean_fmt) << "\n";
-  log_info(ss.str());
+  logger.logInfo(ss.str());
 }
 
 // // // Full graph result update interval
 // // privateNode.getParam("updateResultsInterval", _updateResultsInterval);
-// // log_info("MaplabIntegrator - Full Graph Result Updated Every: " << _updateResultsInterval << " seconds");
+// // logger.logInfo("MaplabIntegrator - Full Graph Result Updated Every: " << _updateResultsInterval << " seconds");
 
 // // // Subscribers
 
@@ -155,7 +151,7 @@ GraphManager::GraphManager(GraphManagerConfig const& config)
 
 // // int MaplabIntegrator::lidarOdomCallback(const nav_msgs::Odometry::ConstPtr& odomPtr) {
 // //   if (odomPtr == nullptr) {
-// //     log_info("MaplabIntegrator - nullptr passed to Odometry callback");
+// //     logger.logInfo("MaplabIntegrator - nullptr passed to Odometry callback");
 // //     return -1;
 // //   }
 
@@ -235,7 +231,7 @@ GraphManager::GraphManager(GraphManagerConfig const& config)
 
 // //   // DEBUG
 // //   if (_verbose > 0) {
-// //     log_info_COND(new_key % 10 == 0, "\033[35mODOMETRY\033[0m ts: " << odomPtr->header.stamp
+// //     logger.logInfo_COND(new_key % 10 == 0, "\033[35mODOMETRY\033[0m ts: " << odomPtr->header.stamp
 // //                                                                            << ", key: " << new_key
 // //                                                                            << ", T_G_B t(m): " << _T_G_B_inc.translation().transpose()
 // //                                                                            << ", time(ms): " << std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count());
@@ -250,10 +246,10 @@ GraphManager::GraphManager(GraphManagerConfig const& config)
 // // }
 
 void GraphManager::odometryCallback(nav_msgs::msg::Odometry const& odom) {
-  log_info("Odometry callback");
+  GraphManagerLogger::getInstance().logInfo("Odometry callback");
 
   // //   if (odomPtr == nullptr) {
-  // //     log_info("MaplabIntegrator - nullptr passed to Odometry callback");
+  // //     logger.logInfo("MaplabIntegrator - nullptr passed to Odometry callback");
   // //     return;
   // //   }
 
@@ -333,7 +329,7 @@ void GraphManager::odometryCallback(nav_msgs::msg::Odometry const& odom) {
 
   // //   // DEBUG
   // //   if (_verbose > 0) {
-  // //     log_info_COND(new_key % 10 == 0, "\033[35mODOMETRY\033[0m ts: " << odomPtr->header.stamp
+  // //     logger.logInfo_COND(new_key % 10 == 0, "\033[35mODOMETRY\033[0m ts: " << odomPtr->header.stamp
   // //                                                                            << ", key: " << new_key
   // //                                                                            << ", T_G_B t(m): " << _T_G_B_inc.translation().transpose()
   // //                                                                            << ", time(ms): " << std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count());
@@ -343,7 +339,7 @@ void GraphManager::odometryCallback(nav_msgs::msg::Odometry const& odom) {
 
 // // void MaplabIntegrator::absolutePoseCallback(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr& posePtr) {
 // //   if (posePtr == nullptr || _firstOdomMsg) {
-// //     log_info("MaplabIntegrator - nullptr passed to Absolute Pose Factor callback");
+// //     logger.logInfo("MaplabIntegrator - nullptr passed to Absolute Pose Factor callback");
 // //     return;
 // //   }
 
@@ -388,7 +384,7 @@ void GraphManager::odometryCallback(nav_msgs::msg::Odometry const& odom) {
 
 // //   // DEBUG
 // //   if (_verbose > 0) {
-// //     log_info("\033[33mABSOLUTE\033[0m"
+// //     logger.logInfo("\033[33mABSOLUTE\033[0m"
 // //                     << ", T_G_M t(m):" << _T_G_M.translation().transpose()
 // //                     << ", RPY(deg): " << _T_G_M.rotation().rpy().transpose() * (180.0 / M_PI)
 // //                     << ", time(ms): " << std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count());
@@ -418,7 +414,7 @@ void GraphManager::odometryCallback(nav_msgs::msg::Odometry const& odom) {
 // //       if (key_itr != _timestampKeyMap.end()) {
 // //         key = key_itr->second;  // Save Key
 // //       } else {
-// //         if (_verbose) log_info("\033[36mANCHOR\033[0m - Found no closest key for ts: :" << ros::Time(ts));
+// //         if (_verbose) logger.logInfo("\033[36mANCHOR\033[0m - Found no closest key for ts: :" << ros::Time(ts));
 // //         continue;
 // //       }
 
@@ -436,7 +432,7 @@ void GraphManager::odometryCallback(nav_msgs::msg::Odometry const& odom) {
 // //       if (anchor_itr != _keyAnchorPoseMap.end()) {
 // //         bool equal = anchor_itr->second.equals(T_G_B, 0.2);
 // //         if (equal) {
-// //           if (_verbose) log_info("\033[36mANCHOR\033[0m - Found Key: " << key
+// //           if (_verbose) logger.logInfo("\033[36mANCHOR\033[0m - Found Key: " << key
 // //                                                                               << ", ts: " << ros::Time(ts)
 // //                                                                               << ", t(x,y,z): " << T_G_B.translation().transpose()
 // //                                                                               << ", Equal: \033[32mYES\033[0m - SKIP");
@@ -448,13 +444,13 @@ void GraphManager::odometryCallback(nav_msgs::msg::Odometry const& odom) {
 // //       // Find if Prior factor exists at Key and get Factor Index
 // //       auto itr = _keyAnchorFactorIdxMap.find(key);
 // //       if (itr != _keyAnchorFactorIdxMap.end()) {
-// //         if (_verbose) log_info("\033[36mANCHOR\033[0m - Found Key: " << key
+// //         if (_verbose) logger.logInfo("\033[36mANCHOR\033[0m - Found Key: " << key
 // //                                                                             << ", ts: " << ros::Time(ts)
 // //                                                                             << ", Equal: \033[31mNO\033[0m"
 // //                                                                             << ", Removing Prior with Index: " << itr->second);
 // //         removeFactorIdx.push_back(itr->second);
 // //       } else if (_verbose)
-// //         log_info("\033[36mANCHOR\033[0m - Found Key: " << key
+// //         logger.logInfo("\033[36mANCHOR\033[0m - Found Key: " << key
 // //                                                               << ", ts: " << ros::Time(ts)
 // //                                                               << ", t(x,y,z): " << T_G_B.translation().transpose()
 // //                                                               << ", Equal: \033[31mNO\033[0m - New Prior Added");
@@ -471,14 +467,14 @@ void GraphManager::odometryCallback(nav_msgs::msg::Odometry const& odom) {
 // //       updateKeyAnchorPoseMap(key, T_G_B);  // Associate Anchor pose to key
 // //     }
 // //     auto t2 = std::chrono::high_resolution_clock::now();
-// //     if (_verbose) log_info("\033[36mANCHOR-UPDATE\033[0m - time(ms): " << std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count());
+// //     if (_verbose) logger.logInfo("\033[36mANCHOR-UPDATE\033[0m - time(ms): " << std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count());
 // //   }
 // // }
 
 // // void MaplabIntegrator::maplabSubmapCallback(const nav_msgs::Path::ConstPtr& pathPtr) {
 // //   // Check if empty message
 // //   if (pathPtr == nullptr || _firstOdomMsg) {
-// //     log_info("MaplabIntegrator - nullptr passed to Submap callback or graph not initialized from odometry yet");
+// //     logger.logInfo("MaplabIntegrator - nullptr passed to Submap callback or graph not initialized from odometry yet");
 // //     return;
 // //   }
 
@@ -501,7 +497,7 @@ void GraphManager::odometryCallback(nav_msgs::msg::Odometry const& odom) {
 
 // //           // Skip if keys are same
 // //           if (child_key == parent_key) {
-// //             if (_verbose) log_info("MaplabIntegrator - Same Submap Parent/Child keys, key:" << child_key);
+// //             if (_verbose) logger.logInfo("MaplabIntegrator - Same Submap Parent/Child keys, key:" << child_key);
 // //             continue;
 // //           }
 
@@ -523,17 +519,17 @@ void GraphManager::odometryCallback(nav_msgs::msg::Odometry const& odom) {
 // //           _newFactors.resize(0);
 // //           incFactorCount();
 // //           updateKeySubmapFactorIdxMap(parent_key, child_key);
-// //           if (_verbose) log_info("\033[34mSUBMAP\033[0m - " << (rmIdx == -1 ? "Added" : "Replaced") << ": P(" << parent_key << ")-C(" << child_key << "), delta_t(x,y,z):" << T_B1B2.translation().transpose());
+// //           if (_verbose) logger.logInfo("\033[34mSUBMAP\033[0m - " << (rmIdx == -1 ? "Added" : "Replaced") << ": P(" << parent_key << ")-C(" << child_key << "), delta_t(x,y,z):" << T_B1B2.translation().transpose());
 // //         } else
 // //           continue;
 // //       }
 // //       auto t2 = std::chrono::high_resolution_clock::now();
 
 // //       // DEBUG
-// //       if (_verbose) log_info("\033[34mSUBMAP-UPDATE\033[0m - Constraints added: " << pathPtr->poses.size() << ", time(ms): " << std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count());
+// //       if (_verbose) logger.logInfo("\033[34mSUBMAP-UPDATE\033[0m - Constraints added: " << pathPtr->poses.size() << ", time(ms): " << std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count());
 // //       // DEBUG
 // //     } else {
-// //       if (_verbose) log_info("\033[34mSUBMAP\033[0m  - Found no key for parent at ts: " << ros::Time(parent_ts) << " --- SKIPPING CHILDERN ---");
+// //       if (_verbose) logger.logInfo("\033[34mSUBMAP\033[0m  - Found no key for parent at ts: " << ros::Time(parent_ts) << " --- SKIPPING CHILDERN ---");
 // //       return;
 // //     }
 // //   }
@@ -731,8 +727,8 @@ void GraphManager::odometryCallback(nav_msgs::msg::Odometry const& odom) {
 // //   // DEBUG
 // //   auto t2 = std::chrono::high_resolution_clock::now();
 // //   if (_verbose) {
-// //     log_info("\033[36mGRAPH UPDATE\033[0m - time(us):" << t_update << ", Map Build(ms): " << std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count());
-// //     log_info("\033[36mGRAPH UPDATE\033[0m - number of factors: " << _factor_count);
+// //     logger.logInfo("\033[36mGRAPH UPDATE\033[0m - time(us):" << t_update << ", Map Build(ms): " << std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count());
+// //     logger.logInfo("\033[36mGRAPH UPDATE\033[0m - number of factors: " << _factor_count);
 // //   }
 // //   // DEBUG
 // // }
@@ -854,7 +850,7 @@ void GraphManager::odometryCallback(nav_msgs::msg::Odometry const& odom) {
 // //       c_set.erase(output);
 // //     }
 // //   } else if (result.size() > 1) {
-// //     log_info("MaplabIntegrator - Submaps connected by mutliple between factors");
+// //     logger.logInfo("MaplabIntegrator - Submaps connected by mutliple between factors");
 // //     std::cout << "Indices found: ";
 // //     for (auto& e : result)
 // //       std::cout << e << " ";
