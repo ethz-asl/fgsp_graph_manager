@@ -2,13 +2,10 @@
 
 GraphManagerNode::GraphManagerNode()
     : rclcpp::Node("graph_manager") {
-  std::cout << "Initializing Node..." << std::endl;
+  std::cout << "Initializing Graph Manager..." << std::endl;
 
   config_.reset(fgsp::GraphManagerConfig::init(*this));
   manager_ = std::make_unique<fgsp::GraphManager>(*config_);
-
-  // if (maplabIntegrator_->setup(nh_, pnh_))
-  // std::cout << "--- Laser Maplab Integrator Nodelet Initialized ---" << std::endl;
 }
 
 int main(int argc, char** argv) {

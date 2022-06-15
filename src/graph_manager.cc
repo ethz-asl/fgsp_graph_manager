@@ -12,38 +12,19 @@ static void log_error(const std::string& msg) {
 
 GraphManager::GraphManager(GraphManagerConfig const& config)
     : config_(config) {
+  log_info("GraphManager - Verbosity level set to: " + std::to_string(config.verbose));
+  log_info("GraphManager - World/Global frame set to: " + config.world_frame);
+  log_info("GraphManager - Robot Map frame set to: " + config.map_frame);
+  log_info("GraphManager - Robot Base frame set to: " + config.base_frame);
+
+  log_info("GraphManager - Minimum Position(m) delta Norm: " + std::to_string(config.pos_delta));
+  log_info("GraphManager - Minimum Rotation(rad) delta Norm: " + std::to_string(config.rot_delta));
+
+  log_info("GraphManager - LiDAR Frame: " + config.lidar_frame);
+  log_info("GraphManager - Camera Frame: " + config.camera_frame);
+  log_info("GraphManager - IMU Frame: " + config.imu_frame);
 }
 // // bool GraphManager::setup() {
-// // // Parameters
-// // if (privateNode.getParam("maplabIntegratorVerbosity", _verbose))
-// //   log_info("MaplabIntegrator - Verbosity level set to: " << _verbose);
-// // // Frames
-// // if (privateNode.getParam("world_frame", _world_frame))
-// //   log_info("MaplabIntegrator - World/Global frame set to: " << _world_frame);
-// // if (privateNode.getParam("map_frame", _map_frame))
-// //   log_info("MaplabIntegrator - Robot Map frame set to: " << _map_frame);
-// // if (privateNode.getParam("base_frame", _base_frame))
-// //   log_info("MaplabIntegrator - Robot Base frame set to: " << _base_frame);
-
-// // // Pointcloud save delta
-// // if (privateNode.getParam("cloudSavePosDelta", _cloudSavePosDelta))
-// //   log_info("MaplabIntegrator - Minimum Position(m) delta Norm for saving pointcloud: " << _cloudSavePosDelta);
-// // if (privateNode.getParam("cloudSaveRotDelta", _cloudSaveRotDelta))
-// //   log_info("MaplabIntegrator - Minimum Rotation(rad) delta Norm for saving pointcloud: " << _cloudSaveRotDelta);
-
-// // // Extrinsic Calibrations
-// // // LiDAR frame for look-up
-// // if (privateNode.getParam("lidarFrame", _lidar_frame))
-// //   log_info("MaplabIntegrator - LiDAR Frame: " << _lidar_frame);
-// // if (_lidar_frame.empty()) log_error("MaplabIntegrator - No LiDAR frame provided")
-// // // Camera frame for look-up
-// // if (privateNode.getParam("maplab_camera_frame", _camera_frame))
-// //   log_info("MaplabIntegrator - Camera Frame: " << _camera_frame);
-// // if (_camera_frame.empty().empty()) log_error("MaplabIntegrator - No Camera frame provided")
-// // // IMU frame for look-up
-// // if (privateNode.getParam("maplab_imu_frame", _imu_frame))
-// //   log_info("MaplabIntegrator - IMU Frame: " << _imu_frame);
-// // if (_imu_frame.empty()) log_error("MaplabIntegrator - No IMU frame provided")
 
 // // // Factor Noise parameters
 // // std::vector<double> odomNoise;
