@@ -27,7 +27,9 @@ include_directories(
 ament_export_include_directories(include)
 
 add_library(graph_manager STATIC
-  src/graph_manager.cc)
+  src/graph_manager.cc
+  src/graph_manager_config.cc
+  src/graph_manager_logger.cc)
 ament_target_dependencies(graph_manager rclcpp geometry_msgs nav_msgs sensor_msgs message_filters)
 
 add_executable(graph_manager_node src/graph_manager_node.cc)
