@@ -1,4 +1,4 @@
-# These are some examples of commonly ignored file patterns.
+#ke These are some examples of commonly ignored file patterns.
 # You should customize this list as applicable to your project.
 # Learn more about .gitignore:
 #     https://www.atlassian.com/git/tutorials/saving-changes/gitignore
@@ -47,10 +47,6 @@ Thumbs.db
 *.flv
 *.mov
 *.wmv
-
-# Text and CSV files
-*.txt
-*.csv
 
 # vscode
 .vscode/
