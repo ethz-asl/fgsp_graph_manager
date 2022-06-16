@@ -143,84 +143,76 @@ void GraphManager::odometryCallback(nav_msgs::msg::Odometry const& odom) {
   }
 }
 
-// // void MaplabIntegrator::maplabAnchorCallback(const nav_msgs::Path::ConstPtr& pathPtr) {
-// //   // Check if empty message
-// //   if (pathPtr == nullptr || _firstOdomMsg) {
-// //     std::cout << std::fixed << "\033[31mANCHOR\033[0m - Passed nullptr or graph not initialized from odometry yet" << std::endl;
-// //     return;
-// //   }
+void GraphManager::processAnchorConstraints(nav_msgs::msg::Path const& path) {
+  // Check if empty message
+  auto const& logger = GraphManagerLogger::getInstance();
+  if (first_odom_msg_) {
+    logger.logError("First odometry message has not been received yet!");
+    return;
+  }
 
-// //   // Loop through all pose updates and add prior factor on graph nodes
-// //   {
-// //     std::lock_guard<std::mutex> lock(_graphMutex);
-// //     auto t1 = std::chrono::high_resolution_clock::now();
-// //     gtsam::FactorIndices remove_factor_idx;
-// //     for (const geometry_msgs::PoseStamped& pose_msg : pathPtr->poses) {
-// //       // Update timestamp
-// //       const double ts = pose_msg.header.stamp.toSec();
+  // Loop through all pose updates and add prior factor on graph nodes
+  {
+    std::lock_guard<std::mutex> lock(graph_mutex_);
+    auto t1 = std::chrono::high_resolution_clock::now();
+    gtsam::FactorIndices remove_factor_idx;
+    for (const geometry_msgs::msg::PoseStamped& pose_msg : path.poses) {
+      // Update timestamp
+      const double ts = pose_msg.header.stamp.sec;
 
-// //       // Find corresponding key in graph
-// //       gtsam::Key key;
-// //       auto key_itr = timestamp_key_map_.find(ts);
-// //       if (key_itr != timestamp_key_map_.end()) {
-// //         key = key_itr->second;  // Save Key
-// //       } else {
-// //         if (_verbose) logger.logInfo("\033[36mANCHOR\033[0m - Found no closest key for ts: :" << ros::Time(ts));
-// //         continue;
-// //       }
+      // Find corresponding key in graph
+      gtsam::Key key;
+      auto key_itr = timestamp_key_map_.find(ts);
+      if (key_itr != timestamp_key_map_.end()) {
+        key = key_itr->second;  // Save Key
+      } else {
+        if (config_.verbose) logger.logInfo("\033[36mANCHOR\033[0m - Found no closest key for ts: " + std::to_string(ts));
+        continue;
+      }
 
-// //       // Only Absolute poses can be attached to Key 0
-// //       if (key == 0)
-// //         continue;
+      // Only Absolute poses can be attached to Key 0
+      if (key == 0)
+        continue;
 
-// //       // Create Update pose
-// //       const auto& p = pose_msg.pose;
-// //       const gtsam::Pose3 T_G_B(gtsam::Rot3(p.orientation.w, p.orientation.x, p.orientation.y, p.orientation.z),
-// //                                gtsam::Point3(p.position.x, p.position.y, p.position.z));
+      // Create Update pose
+      const auto& p = pose_msg.pose;
+      const gtsam::Pose3 T_G_B(gtsam::Rot3(p.orientation.w, p.orientation.x, p.orientation.y, p.orientation.z),
+                               gtsam::Point3(p.position.x, p.position.y, p.position.z));
 
-// //       // Compare if anchor pose on same key has changed
-// //       auto anchor_itr = _keyAnchorPoseMap.find(key);
-// //       if (anchor_itr != _keyAnchorPoseMap.end()) {
-// //         bool equal = anchor_itr->second.equals(T_G_B, 0.2);
-// //         if (equal) {
-// //           if (_verbose) logger.logInfo("\033[36mANCHOR\033[0m - Found Key: " << key
-// //                                                                               << ", ts: " << ros::Time(ts)
-// //                                                                               << ", t(x,y,z): " << T_G_B.translation().transpose()
-// //                                                                               << ", Equal: \033[32mYES\033[0m - SKIP");
+      // Compare if anchor pose on same key has changed
+      auto anchor_itr = key_anchor_pose_map_.find(key);
+      if (anchor_itr != key_anchor_pose_map_.end()) {
+        bool equal = anchor_itr->second.equals(T_G_B, 0.2);
+        if (equal) {
+          if (config_.verbose) logger.logInfo("\033[36mANCHOR\033[0m - Found Key: " + std::to_string(key) + ", ts: " + std::to_string(ts) + ", Equal: \033[32mYES\033[0m - SKIP");
 
-// //           continue;
-// //         }
-// //       }
+          continue;
+        }
+      }
 
-// //       // Find if Prior factor exists at Key and get Factor Index
-// //       auto itr = _keyAnchorFactorIdxMap.find(key);
-// //       if (itr != _keyAnchorFactorIdxMap.end()) {
-// //         if (_verbose) logger.logInfo("\033[36mANCHOR\033[0m - Found Key: " << key
-// //                                                                             << ", ts: " << ros::Time(ts)
-// //                                                                             << ", Equal: \033[31mNO\033[0m"
-// //                                                                             << ", Removing Prior with Index: " << itr->second);
-// //         remove_factor_idx.push_back(itr->second);
-// //       } else if (_verbose)
-// //         logger.logInfo("\033[36mANCHOR\033[0m - Found Key: " << key
-// //                                                               << ", ts: " << ros::Time(ts)
-// //                                                               << ", t(x,y,z): " << T_G_B.translation().transpose()
-// //                                                               << ", Equal: \033[31mNO\033[0m - New Prior Added");
+      // Find if Prior factor exists at Key and get Factor Index
+      auto itr = key_anchor_factor_idx_map_.find(key);
+      if (itr != key_anchor_factor_idx_map_.end()) {
+        if (config_.verbose) logger.logInfo("\033[36mANCHOR\033[0m - Found Key: " + std::to_string(key) + ", ts: " + std::to_string(ts) + ", Equal: \033[31mNO\033[0m" + ", Removing Prior with Index: " + std::to_string(itr->second));
+        remove_factor_idx.push_back(itr->second);
+      } else if (config_.verbose)
+        logger.logInfo("\033[36mANCHOR\033[0m - Found Key: " + std::to_string(key) + ", ts: " + std::to_string(ts) + ", Equal: \033[31mNO\033[0m - New Prior Added");
 
-// //       // Update graph
-// //       static auto anchorNoise = gtsam::noiseModel::Diagonal::Sigmas(_anchorNoise);
-// //       _newFactors.emplace_shared<gtsam::PriorFactor<gtsam::Pose3>>(X(key), T_G_B, anchorNoise);
-// //       _graph->update(_newFactors, gtsam::Values(), remove_factor_idx);
-// //       _newFactors.resize(0);  // Reset
-// //       incFactorCount();
+      // Update graph
+      static auto anchorNoise = gtsam::noiseModel::Diagonal::Sigmas(anchor_noise_);
+      new_factors_.emplace_shared<gtsam::PriorFactor<gtsam::Pose3>>(X(key), T_G_B, anchorNoise);
+      graph_->update(new_factors_, gtsam::Values(), remove_factor_idx);
+      new_factors_.resize(0);  // Reset
+      incFactorCount();
 
-// //       // Update lookup maps
-// //       updateKeyAnchorFactorIdxMap(key);    // Assosicate index of new prior factor to graph key
-// //       updateKeyAnchorPoseMap(key, T_G_B);  // Associate Anchor pose to key
-// //     }
-// //     auto t2 = std::chrono::high_resolution_clock::now();
-// //     if (_verbose) logger.logInfo("\033[36mANCHOR-UPDATE\033[0m - time(ms): " << std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count());
-// //   }
-// // }
+      // Update lookup maps
+      updateKeyAnchorFactorIdxMap(key);    // Assosicate index of new prior factor to graph key
+      updateKeyAnchorPoseMap(key, T_G_B);  // Associate Anchor pose to key
+    }
+    auto t2 = std::chrono::high_resolution_clock::now();
+    if (config_.verbose) logger.logInfo("\033[36mANCHOR-UPDATE\033[0m - time(ms): " + std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count()));
+  }
+}
 
 void GraphManager::processRelativeConstraints(nav_msgs::msg::Path const& path) {
   auto const& logger = GraphManagerLogger::getInstance();

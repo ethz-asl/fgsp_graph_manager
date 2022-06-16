@@ -36,17 +36,9 @@ namespace fgsp {
 class GraphManager {
  public:
   explicit GraphManager(GraphManagerConfig const& config, GraphManagerPublisher& publisher);
-  // Setup
-  //  bool setup(ros::NodeHandle& node, ros::NodeHandle& privateNode);
 
-  //  private:
-  //   //Callbacks
-  //   void syncCallbackHandler(const nav_msgs::OdometryConstPtr& odomPtr, const OptStatusConstPtr& odomStatusPtr, const sensor_msgs::PointCloud2ConstPtr& cloudPtr);
-  //   int lidarOdomCallback(const nav_msgs::Odometry::ConstPtr& odomPtr);
   void odometryCallback(nav_msgs::msg::Odometry const& odom);
-  //   void cloudCallback(int key, const sensor_msgs::PointCloud2ConstPtr& cloudPtr);
-  //   void absolutePoseCallback(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr& posePtr);
-  //   void maplabAnchorCallback(const nav_msgs::Path::ConstPtr& pathPtr);
+  void processAnchorConstraints(nav_msgs::msg::Path const& path);
   void processRelativeConstraints(nav_msgs::msg::Path const& path);
 
   // Get State key
@@ -64,8 +56,8 @@ class GraphManager {
   bool createPoseMessage(const gtsam::Pose3& pose, geometry_msgs::msg::PoseStamped* pose_msg) const;
 
   //   //Lookup maps for key-factor association
-  //   void updateKeyAnchorFactorIdxMap(const gtsam::Key key) { _keyAnchorFactorIdxMap[key] = factor_count_ - 1; }
-  //   void updateKeyAnchorPoseMap(const gtsam::Key key, const gtsam::Pose3& pose) { _keyAnchorPoseMap[key] = pose; }
+  void updateKeyAnchorFactorIdxMap(const gtsam::Key key) { key_anchor_factor_idx_map_[key] = factor_count_ - 1; }
+  void updateKeyAnchorPoseMap(const gtsam::Key key, const gtsam::Pose3& pose) { key_anchor_pose_map_[key] = pose; }
   void updateKeySubmapFactorIdxMap(const gtsam::Key parent_key, const gtsam::Key child_key);
   int findSubmapFactorIdx(const gtsam::Key parent_key, const gtsam::Key child_key, bool erase = false);
 
@@ -142,8 +134,8 @@ class GraphManager {
   // Lookup map objects for key-to-factorIndex associations
   std::unordered_map<double, gtsam::Key> timestamp_key_map_;                          // Timestamp-Key map for lookup of keys corresponding to odometry timestamps
   std::unordered_map<gtsam::Key, double> key_timestamp_map_;                          // Key-Timestamp map used for publishing graph node timestamps for path message publishing
-  std::unordered_map<gtsam::Key, size_t> keyAnchorFactorIdxMap_;                      // Key-PriorFactorIndex map for lookup of indices of prior factor add at key for Anchor poses
-  std::unordered_map<gtsam::Key, gtsam::Pose3> keyAnchorPoseMap_;                     // Key-AnchorPose map for lookup of applied anchor pose as prior factor at Key
+  std::unordered_map<gtsam::Key, size_t> key_anchor_factor_idx_map_;                  // Key-PriorFactorIndex map for lookup of indices of prior factor add at key for Anchor poses
+  std::unordered_map<gtsam::Key, gtsam::Pose3> key_anchor_pose_map_;                  // Key-AnchorPose map for lookup of applied anchor pose as prior factor at Key
   std::unordered_map<gtsam::Key, std::set<size_t>> key_submap_factor_idx_map_;        // Key-SubmapBetweenFactorIndex map for lookup of indices of betweenfactor added at key for Submap constraints
   std::unordered_map<gtsam::Key, std::set<gtsam::Key>> submap_parent_child_key_map_;  // Parent-Child keys for visualization of relative submap constrinats
 
@@ -154,7 +146,7 @@ class GraphManager {
   gtsam::Pose3 last_odom_save_pose_;  // pose of last pointcloud saved
 
   //   //Debug
-  // int _verbose = 0;                                           //Verbosity level of MaplabIntegrator (0:quiet)
+  // int config_.verbose = 0;                                           //Verbosity level of MaplabIntegrator (0:quiet)
   //   ros::Publisher _pubConstraintMarkers;                       //Constraint marker publisher
   //   visualization_msgs::Marker _absoluteMarkerMsg;              //Absolute contraint marker messages
   //   visualization_msgs::Marker _anchorMarkerMsg;                //Anchor(Unary) contraint marker messages
