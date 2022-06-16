@@ -48,34 +48,31 @@ class GraphManager {
   //   void maplabAnchorCallback(const nav_msgs::Path::ConstPtr& pathPtr);
   //   void maplabSubmapCallback(const nav_msgs::Path::ConstPtr& pathPtr);
 
-  //   //Get State key
-  auto stateKey() const -> gtsam::Key { return _state_key; }
-  //   //State Key increment
-  auto newStateKey() -> gtsam::Key { return ++_state_key; }
-  //   //Add prior
-  //   void addPriorFactor(const gtsam::Key key, const gtsam::Pose3& pose);
-  //   //Add a pose between factor
-  //   void addPoseBetweenFactor(const gtsam::Key old_key, const gtsam::Key new_key, const gtsam::Pose3& pose_delta, const gtsam::Pose3& pose_estimate);
-  //   //Add prior factor from global graph
-  //   bool findClosestKeyForTS(const double ts, gtsam::Key* key) const;  //TODO - deprecate
+  // Get State key
+  auto stateKey() const -> gtsam::Key { return state_key_; }
+  // State Key increment
+  auto newStateKey() -> gtsam::Key { return ++state_key_; }
+  // Add prior
+  void addPriorFactor(const gtsam::Key key, const gtsam::Pose3& pose);
+  // Add a pose between factor
+  void addPoseBetweenFactor(const gtsam::Key old_key, const gtsam::Key new_key, const gtsam::Pose3& pose_delta, const gtsam::Pose3& pose_estimate);
   //   //Update ISAM graph
-  //   void updateGraphResults();
+  void updateGraphResults();
   //   //Publish associated transforms
   //   void publishTransforms(const ros::Time& ts);
 
   //   //Utility methods
-  //   bool createPoseMessage(const gtsam::Pose3& pose, geometry_msgs::PoseStamped* pose_msg) const;
-  //   void convertTransfromToPose(const geometry_msgs::TransformStamped& t, geometry_msgs::PoseStamped& p);
+  bool createPoseMessage(const gtsam::Pose3& pose, geometry_msgs::msg::PoseStamped* pose_msg) const;
 
   //   //Lookup maps for key-factor association
-  //   void updateKeyAnchorFactorIdxMap(const gtsam::Key key) { _keyAnchorFactorIdxMap[key] = _factor_count - 1; }
+  //   void updateKeyAnchorFactorIdxMap(const gtsam::Key key) { _keyAnchorFactorIdxMap[key] = factor_count_ - 1; }
   //   void updateKeyAnchorPoseMap(const gtsam::Key key, const gtsam::Pose3& pose) { _keyAnchorPoseMap[key] = pose; }
   //   void updateKeySubmapFactorIdxMap(const gtsam::Key parent_key, const gtsam::Key child_key);
   //   int findSubmapFactorIdx(const gtsam::Key parent_key, const gtsam::Key child_key, bool erase = false);
 
   //   //Factor count increment and retreivel
-  void incFactorCount() { ++_factor_count; }
-  auto getFactorCount() -> std::size_t { return _factor_count; }
+  void incFactorCount() { ++factor_count_; }
+  auto getFactorCount() -> std::size_t { return factor_count_; }
 
   //   //Intialize Sensor extrinsic transforms
   //   void initSensorTransforms();
@@ -113,51 +110,50 @@ class GraphManager {
   //   //Transforms
   //   tf::TransformListener _tl;       // Transform Listener for calculating external estimate
   //   std::string _lidar_frame = "";   //LiDAR frame name - used for LiDAR-to-Sensor transform lookup
-  //   std::string _camera_frame = "";  //Frame of camera used for apriltag detection (absolute poses)
-  //   std::string _imu_frame = "";     //Frame of IMU used by maplab
-  //   gtsam::Pose3 _T_L_B;             //IMU(B) to LiDAR(L)
-  //   gtsam::Pose3 _T_B_C;             //camera(C) to  IMU(B)
-  //   gtsam::Pose3 _T_G_M;             //Robot(Local) Map(M) to DARPA(G) - Local Robot Map start at origin MUST BE SET TO ZERO ON INIT in (B) frame - this needs to be updated to make the local graph expressed w.r.t (G)
-  //   gtsam::Pose3 _T_G_B_opt;         //IMU to DARPA(G) - optimized
-  //   gtsam::Pose3 _T_G_B_inc;         //IMU to DARPA(G) - incremental
+  // std::string _camera_frame = "";  //Frame of camera used for apriltag detection (absolute poses)
+  // std::string _imu_frame = "";     //Frame of IMU used by maplab
+  gtsam::Pose3 T_O_B_;      // IMU(B) to LiDAR(L)
+  gtsam::Pose3 T_B_C_;      // camera(C) to  IMU(B)
+  gtsam::Pose3 T_G_M_;      // Robot(Local) Map(M) to DARPA(G) - Local Robot Map start at origin MUST BE SET TO ZERO ON INIT in (B) frame - this needs to be updated to make the local graph expressed w.r.t (G)
+  gtsam::Pose3 T_G_B_opt_;  // IMU to DARPA(G) - optimized
+  gtsam::Pose3 T_G_B_inc_;  // IMU to DARPA(G) - incremental
 
   // Factor graph
-  std::size_t _factor_count = 0;            // Counter for Total factors (existing + removed)
-  std::mutex _graphMutex;                   // For adding new factors and graph update
-  gtsam::ISAM2Params _params;               // Graph parameters
-  gtsam::NonlinearFactorGraph _newFactors;  // New factors to be added to the graph
-  std::shared_ptr<gtsam::ISAM2> _graph;     // iSAM2 GRAPH object
-  gtsam::Key _state_key = 0;                // Current state key
+  std::size_t factor_count_ = 0;            // Counter for Total factors (existing + removed)
+  std::mutex graphMutex_;                   // For adding new factors and graph update
+  gtsam::ISAM2Params params_;               // Graph parameters
+  gtsam::NonlinearFactorGraph newFactors_;  // New factors to be added to the graph
+  std::shared_ptr<gtsam::ISAM2> graph_;     // iSAM2 GRAPH object
+  gtsam::Key state_key_ = 0;                // Current state key
                                             // std::vector<StatePtr> _states;  // Vecotr of states //TODO deprecate
 
   // Factor noise vectors - ORDER RPY(rad) - XYZ(meters)
-  gtsam::Vector6 _odomNoise;      // Odometry BetweenFactor Noise
-  gtsam::Vector6 _absoluteNoise;  // Absolute(AprilTag) PriorFactor Noise
-  gtsam::Vector6 _submapNoise;    // Submap BetweenFactor Noise
-  gtsam::Vector6 _anchorNoise;    // Anchor PriorFactor Noise
+  gtsam::Vector6 odomNoise_;      // Odometry BetweenFactor Noise
+  gtsam::Vector6 absoluteNoise_;  // Absolute(AprilTag) PriorFactor Noise
+  gtsam::Vector6 submapNoise_;    // Submap BetweenFactor Noise
+  gtsam::Vector6 anchorNoise_;    // Anchor PriorFactor Noise
 
   // Odometry factor
-  bool _firstOdomMsg = true;
-  gtsam::Pose3 _lastIMUPose;
-  bool _isOdomDegenerate = false;
+  bool first_odom_msg_ = true;
+  gtsam::Pose3 last_IMU_pose_;
 
   // Absolute pose factor
-  bool _firstAbsolutePose = true;
+  bool firstAbsolutePose_ = true;
 
-  //   //Lookup map objects for key-to-factorIndex associations
-  //   std::unordered_map<double, gtsam::Key> _timestampKeyMap;                        //Timestamp-Key map for lookup of keys corresponding to odometry timestamps
-  //   std::unordered_map<gtsam::Key, double> _keyTimestampMap;                        //Key-Timestamp map used for publishing graph node timestamps for path message publishing
-  //   std::unordered_map<gtsam::Key, size_t> _keyAnchorFactorIdxMap;                  //Key-PriorFactorIndex map for lookup of indices of prior factor add at key for Anchor poses
-  //   std::unordered_map<gtsam::Key, gtsam::Pose3> _keyAnchorPoseMap;                 //Key-AnchorPose map for lookup of applied anchor pose as prior factor at Key
-  //   std::unordered_map<gtsam::Key, std::set<size_t>> _keySubmapFactorIdxMap;        //Key-SubmapBetweenFactorIndex map for lookup of indices of betweenfactor added at key for Submap constraints
-  //   std::unordered_map<gtsam::Key, std::set<gtsam::Key>> _submapParentChildKeyMap;  //Parent-Child keys for visualization of relative submap constrinats
+  // Lookup map objects for key-to-factorIndex associations
+  std::unordered_map<double, gtsam::Key> timestampKeyMap_;                        // Timestamp-Key map for lookup of keys corresponding to odometry timestamps
+  std::unordered_map<gtsam::Key, double> keyTimestampMap_;                        // Key-Timestamp map used for publishing graph node timestamps for path message publishing
+  std::unordered_map<gtsam::Key, size_t> keyAnchorFactorIdxMap_;                  // Key-PriorFactorIndex map for lookup of indices of prior factor add at key for Anchor poses
+  std::unordered_map<gtsam::Key, gtsam::Pose3> keyAnchorPoseMap_;                 // Key-AnchorPose map for lookup of applied anchor pose as prior factor at Key
+  std::unordered_map<gtsam::Key, std::set<size_t>> keySubmapFactorIdxMap_;        // Key-SubmapBetweenFactorIndex map for lookup of indices of betweenfactor added at key for Submap constraints
+  std::unordered_map<gtsam::Key, std::set<gtsam::Key>> submapParentChildKeyMap_;  // Parent-Child keys for visualization of relative submap constrinats
 
   //   //Timer-based map/result update and publish
   //   double _updateResultsInterval = 30.0;  //Interval (seconds) for graph update callback
   //   ros::Timer _timerUpdateResults;        //Timer callback for graph update
 
   //   //Pointcloud
-  gtsam::Pose3 _lastCloudSavePose;  // pose of last pointcloud saved
+  gtsam::Pose3 lastCloudSavePose_;  // pose of last pointcloud saved
 
   //   //Debug
   // int _verbose = 0;                                           //Verbosity level of MaplabIntegrator (0:quiet)

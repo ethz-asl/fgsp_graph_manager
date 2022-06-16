@@ -1,4 +1,5 @@
 #include "graph_manager/graph_manager_config.h"
+#include "graph_manager/graph_manager_logger.h"
 
 namespace {
 
@@ -51,8 +52,47 @@ GraphManagerConfig* GraphManagerConfig::init(rclcpp::Node& node) {
   config->anchor_noise_std = parser.get_parameter("anchor_noise_std", config->anchor_noise_std);
 
   config->odom_topic = parser.get_parameter("odom_topic", config->odom_topic);
+  config->update_interval_s = parser.get_parameter("update_interval_s", config->update_interval_s);
+
+  config->T_O_B = parser.get_parameter("T_O_B", config->T_O_B);
+  config->T_B_C = parser.get_parameter("T_B_C", config->T_B_C);
 
   return config;
+}
+
+bool GraphManagerConfig::isValid() const {
+  auto& logger = GraphManagerLogger::getInstance();
+  if (odom_noise_std.size() != 6u) {
+    logger.logError("GraphManager - Odometry noise std vector has wrong size: " + std::to_string(odom_noise_std.size()));
+    return false;
+  }
+
+  if (absolute_noise_std.size() != 6u) {
+    logger.logError("GraphManager - Absolute noise std vector has wrong size: " + std::to_string(absolute_noise_std.size()));
+    return false;
+  }
+
+  if (submap_noise_std.size() != 6u) {
+    logger.logError("GraphManager - Absolute noise std vector has wrong size: " + std::to_string(submap_noise_std.size()));
+    return false;
+  }
+
+  if (anchor_noise_std.size() != 6u) {
+    logger.logError("GraphManager - Absolute noise std vector has wrong size: " + std::to_string(anchor_noise_std.size()));
+    return false;
+  }
+
+  if (T_O_B.size() != 16u) {
+    logger.logError("GraphManager - T_O_B vector has wrong size: " + std::to_string(T_O_B.size()));
+    return false;
+  }
+
+  if (T_B_C.size() != 16u) {
+    logger.logError("GraphManager - T_B_C vector has wrong size: " + std::to_string(T_B_C.size()));
+    return false;
+  }
+
+  return true;
 }
 
 }  // namespace fgsp

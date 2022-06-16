@@ -1,5 +1,6 @@
 #include "graph_manager/graph_manager.h"
 
+#include <chrono>
 #include <sstream>
 
 #include "graph_manager/graph_manager_logger.h"
@@ -21,37 +22,27 @@ GraphManager::GraphManager(GraphManagerConfig const& config)
   logger.logInfo("GraphManager - Camera Frame: " + config.camera_frame);
   logger.logInfo("GraphManager - IMU Frame: " + config.imu_frame);
 
-  if (config.odom_noise_std.size() != 6) {
-    logger.logError("GraphManager - Odometry noise std vector has wrong size: " + std::to_string(config.odom_noise_std.size()));
-    return;
-  }
-  _odomNoise << config.odom_noise_std[0], config.odom_noise_std[1], config.odom_noise_std[2], config.odom_noise_std[3], config.odom_noise_std[4], config.odom_noise_std[5];
+  odomNoise_ = Eigen::Map<const Eigen::Matrix<double, 6, 1>>(config.odom_noise_std.data());
+  absoluteNoise_ = Eigen::Map<const Eigen::Matrix<double, 6, 1>>(config.absolute_noise_std.data());
+  submapNoise_ = Eigen::Map<const Eigen::Matrix<double, 6, 1>>(config.submap_noise_std.data());
+  anchorNoise_ = Eigen::Map<const Eigen::Matrix<double, 6, 1>>(config.anchor_noise_std.data());
 
-  if (config.absolute_noise_std.size() != 6) {
-    logger.logError("GraphManager - Absolute noise std vector has wrong size: " + std::to_string(config.absolute_noise_std.size()));
-    return;
-  }
-  _absoluteNoise << config.absolute_noise_std[0], config.absolute_noise_std[1], config.absolute_noise_std[2], config.absolute_noise_std[3], config.absolute_noise_std[4], config.absolute_noise_std[5];
-
-  if (config.submap_noise_std.size() != 6) {
-    logger.logError("GraphManager - Absolute noise std vector has wrong size: " + std::to_string(config.submap_noise_std.size()));
-    return;
-  }
-  _submapNoise << config.submap_noise_std[0], config.submap_noise_std[1], config.submap_noise_std[2], config.submap_noise_std[3], config.submap_noise_std[4], config.submap_noise_std[5];
-
-  if (config.anchor_noise_std.size() != 6) {
-    logger.logError("GraphManager - Absolute noise std vector has wrong size: " + std::to_string(config.anchor_noise_std.size()));
-    return;
-  }
-  _anchorNoise << config.anchor_noise_std[0], config.anchor_noise_std[1], config.anchor_noise_std[2], config.anchor_noise_std[3], config.anchor_noise_std[4], config.anchor_noise_std[5];
-
+  // TODO(lbern): Move to logger
   Eigen::IOFormat clean_fmt(4, 0, ", ", "\n", "[", "]");
   std::stringstream ss;
-  ss << "GraphManager - Odometry Factor Noise: " << _odomNoise.transpose().format(clean_fmt) << "\n"
-     << "GraphManager - Absolute Factor Noise: " << _absoluteNoise.transpose().format(clean_fmt) << "\n"
-     << "GraphManager - Submap Factor Noise: " << _submapNoise.transpose().format(clean_fmt) << "\n"
-     << "GraphManager - Anchor Factor Noise: " << _anchorNoise.transpose().format(clean_fmt) << "\n";
+  ss << "GraphManager - Odometry Factor Noise: " << odomNoise_.transpose().format(clean_fmt) << "\n"
+     << "GraphManager - Absolute Factor Noise: " << absoluteNoise_.transpose().format(clean_fmt) << "\n"
+     << "GraphManager - Submap Factor Noise: " << submapNoise_.transpose().format(clean_fmt) << "\n"
+     << "GraphManager - Anchor Factor Noise: " << anchorNoise_.transpose().format(clean_fmt) << "\n";
   logger.logInfo(ss.str());
+
+  auto T_O_B = Eigen::Map<const Eigen::Matrix<double, 4, 4>>(config.T_O_B.data());
+  T_O_B_ = gtsam::Pose3(gtsam::Rot3(T_O_B.block(0, 0, 3, 3)), T_O_B.block(0, 3, 3, 1));
+
+  auto T_B_C = Eigen::Map<const Eigen::Matrix<double, 4, 4>>(config.T_B_C.data());
+  T_B_C_ = gtsam::Pose3(gtsam::Rot3(T_B_C.block(0, 0, 3, 3)), T_B_C.block(0, 3, 3, 1));
+  std::cout << "\033[36mMaplabIntegrator\033[0m - T_cam2imu(T_BC):\n"
+            << T_B_C_.matrix() << std::endl;
 }
 
 // // // Full graph result update interval
@@ -164,8 +155,8 @@ GraphManager::GraphManager(GraphManagerConfig const& config)
 // //   gtsam::Pose3 T_M_B = T_M_L * _T_L_B;
 // //   // Compute delta in IMU frame
 // //   if (_firstOdomMsg)  // Store first pose to compute zero delta incase input doesn't start from zero
-// //     _lastIMUPose = T_M_B;
-// //   gtsam::Pose3 T_B1_B2 = _lastIMUPose.between(T_M_B);
+// //     last_IMU_pose_ = T_M_B;
+// //   gtsam::Pose3 T_B1_B2 = last_IMU_pose_.between(T_M_B);
 
 // //   // Add delta pose factor to graph
 // //   gtsam::Key new_key;
@@ -200,7 +191,7 @@ GraphManager::GraphManager(GraphManagerConfig const& config)
 // //   auto t2 = std::chrono::high_resolution_clock::now();
 
 // //   // Save last IMU pose for calculting delta
-// //   _lastIMUPose = T_M_B;
+// //   last_IMU_pose_ = T_M_B;
 
 // //   // Check motion difference to know if incoming cloud should be saved
 // //   gtsam::Pose3 cloud_delta = _lastCloudSavePose.between(T_M_L);
@@ -212,16 +203,16 @@ GraphManager::GraphManager(GraphManagerConfig const& config)
 
 // //   // Publish Graph path
 // //   // Pose Message
-// //   geometry_msgs::PoseStamped poseMsg;
-// //   poseMsg.header.frame_id = (_isOdomDegenerate ? "degenerate" : "");
-// //   poseMsg.header.stamp = odomPtr->header.stamp;
-// //   poseMsg.header.seq = new_key;
-// //   createPoseMessage(_T_G_B_inc, &poseMsg);
+// //   geometry_msgs::PoseStamped pose_msg;
+// //   pose_msg.header.frame_id = (_isOdomDegenerate ? "degenerate" : "");
+// //   pose_msg.header.stamp = odomPtr->header.stamp;
+// //   pose_msg.header.seq = new_key;
+// //   createPoseMessage(_T_G_B_inc, &pose_msg);
 
 // //   // Node Message
 // //   _pathMsg.header.frame_id = _world_frame;
-// //   _pathMsg.header.stamp = poseMsg.header.stamp;
-// //   _pathMsg.poses.emplace_back(std::move(poseMsg));
+// //   _pathMsg.header.stamp = pose_msg.header.stamp;
+// //   _pathMsg.poses.emplace_back(std::move(pose_msg));
 
 // //   // Publish Path
 // //   _pubIncrementalPath.publish(_pathMsg);
@@ -248,57 +239,52 @@ GraphManager::GraphManager(GraphManagerConfig const& config)
 void GraphManager::odometryCallback(nav_msgs::msg::Odometry const& odom) {
   GraphManagerLogger::getInstance().logInfo("Odometry callback");
 
-  // //   if (odomPtr == nullptr) {
-  // //     logger.logInfo("MaplabIntegrator - nullptr passed to Odometry callback");
-  // //     return;
-  // //   }
+  // Current timestamp and odom pose
+  const double ts = odom.header.stamp.sec;
+  const auto& p = odom.pose.pose;
+  const gtsam::Pose3 T_M_O(gtsam::Rot3(p.orientation.w, p.orientation.x, p.orientation.y, p.orientation.z),
+                           gtsam::Point3(p.position.x, p.position.y, p.position.z));
 
-  // //   // Current timestamp and LiDAR pose
-  // //   const double ts = odomPtr->header.stamp.toSec();
-  // //   const auto& p = odomPtr->pose.pose;
-  // //   const gtsam::Pose3 T_M_L(gtsam::Rot3(p.orientation.w, p.orientation.x, p.orientation.y, p.orientation.z),
-  // //                            gtsam::Point3(p.position.x, p.position.y, p.position.z));
-  // //   // IMU pose
-  // //   gtsam::Pose3 T_M_B = T_M_L * _T_L_B;
-  // //   // Compute delta in IMU frame
-  // //   if (_firstOdomMsg)  // Store first pose to compute zero delta incase input doesn't start from zero
-  // //     _lastIMUPose = T_M_B;
-  // //   gtsam::Pose3 T_B1_B2 = _lastIMUPose.between(T_M_B);
+  // IMU pose
+  gtsam::Pose3 T_M_B = T_M_O * T_O_B_;
+  // Compute delta in IMU frame
+  if (first_odom_msg_)  // Store first pose to compute zero delta incase input doesn't start from zero
+    last_IMU_pose_ = T_M_B;
 
-  // //   // Add delta pose factor to graph
-  // //   gtsam::Key new_key;
-  // //   bool saveCloud = false;
-  // //   auto t1 = std::chrono::high_resolution_clock::now();
-  // //   {
-  // //     // If first lidar odometry message has been received
-  // //     std::lock_guard<std::mutex> lock(_graphMutex);
-  // //     if (_firstOdomMsg) {
-  // //       // Initialize - Add temporary identity prior factor
-  // //       new_key = stateKey();
-  // //       addPriorFactor(new_key, gtsam::Pose3::identity());
-  // //       saveCloud = true;
-  // //       // Intialize sensor transforms
-  // //       initSensorTransforms();
-  // //       _firstOdomMsg = false;
-  // //     } else {
-  // //       // Update keys
-  // //       auto old_key = stateKey();
-  // //       new_key = newStateKey();
-  // //       // Calculate new IMU pose estimate in G
-  // //       gtsam::Pose3 T_G_B = _T_G_B_inc * T_B1_B2;
-  // //       // Add delta and estimate as between factor
-  // //       addPoseBetweenFactor(old_key, new_key, T_B1_B2, T_G_B);
-  // //     }
-  // //     // Update Timestamp-Key & Key-Timestamp Map
-  // //     _timestampKeyMap[ts] = new_key;
-  // //     _keyTimestampMap[new_key] = ts;
-  // //     // Get updated result
-  // //     _T_G_B_inc = _graph->calculateEstimate<gtsam::Pose3>(X(new_key));
-  // //   }
-  // //   auto t2 = std::chrono::high_resolution_clock::now();
+  gtsam::Pose3 T_B1_B2 = last_IMU_pose_.between(T_M_B);
 
-  // //   // Save last IMU pose for calculting delta
-  // //   _lastIMUPose = T_M_B;
+  // Add delta pose factor to graph
+  gtsam::Key new_key;
+  bool saveCloud = false;
+  auto t1 = std::chrono::high_resolution_clock::now();
+  {
+    // If first lidar odometry message has been received
+    std::lock_guard<std::mutex> lock(graphMutex_);
+    if (first_odom_msg_) {
+      // Initialize - Add temporary identity prior factor
+      new_key = stateKey();
+      // addPriorFactor(new_key, gtsam::Pose3::identity());
+      saveCloud = true;
+      first_odom_msg_ = false;
+    } else {
+      // Update keys
+      auto old_key = stateKey();
+      new_key = newStateKey();
+      // Calculate new IMU pose estimate in G
+      gtsam::Pose3 T_G_B = T_G_B_inc_ * T_B1_B2;
+      // Add delta and estimate as between factor
+      // addPoseBetweenFactor(old_key, new_key, T_B1_B2, T_G_B);
+    }
+    // Update Timestamp-Key & Key-Timestamp Map
+    timestampKeyMap_[ts] = new_key;
+    keyTimestampMap_[new_key] = ts;
+    // Get updated result
+    T_G_B_inc_ = graph_->calculateEstimate<gtsam::Pose3>(X(new_key));
+  }
+  auto t2 = std::chrono::high_resolution_clock::now();
+
+  // Save last IMU pose for calculting delta
+  last_IMU_pose_ = T_M_B;
 
   // //   // Check motion difference to know if incoming cloud should be saved
   // //   gtsam::Pose3 cloud_delta = _lastCloudSavePose.between(T_M_L);
@@ -310,16 +296,16 @@ void GraphManager::odometryCallback(nav_msgs::msg::Odometry const& odom) {
 
   // //   // Publish Graph path
   // //   // Pose Message
-  // //   geometry_msgs::PoseStamped poseMsg;
-  // //   poseMsg.header.frame_id = (_isOdomDegenerate ? "degenerate" : "");
-  // //   poseMsg.header.stamp = odomPtr->header.stamp;
-  // //   poseMsg.header.seq = new_key;
-  // //   createPoseMessage(_T_G_B_inc, &poseMsg);
+  // //   geometry_msgs::PoseStamped pose_msg;
+  // //   pose_msg.header.frame_id = (_isOdomDegenerate ? "degenerate" : "");
+  // //   pose_msg.header.stamp = odomPtr->header.stamp;
+  // //   pose_msg.header.seq = new_key;
+  // //   createPoseMessage(_T_G_B_inc, &pose_msg);
 
   // //   // Node Message
   // //   _pathMsg.header.frame_id = _world_frame;
-  // //   _pathMsg.header.stamp = poseMsg.header.stamp;
-  // //   _pathMsg.poses.emplace_back(std::move(poseMsg));
+  // //   _pathMsg.header.stamp = pose_msg.header.stamp;
+  // //   _pathMsg.poses.emplace_back(std::move(pose_msg));
 
   // //   // Publish Path
   // //   _pubIncrementalPath.publish(_pathMsg);
@@ -535,203 +521,103 @@ void GraphManager::odometryCallback(nav_msgs::msg::Odometry const& odom) {
 // //   }
 // // }
 
-// // void MaplabIntegrator::addPriorFactor(const gtsam::Key key, const gtsam::Pose3& pose) {
-// //   // Prior factor noise
-// //   static auto priorNoise = gtsam::noiseModel::Isotropic::Sigma(6, 1e-2);
+void GraphManager::addPriorFactor(const gtsam::Key key, const gtsam::Pose3& pose) {
+  // Prior factor noise
+  static auto priorNoise = gtsam::noiseModel::Isotropic::Sigma(6, 1e-2);
 
-// //   // Initial estimate - Use pose as estimate (For prior factors at graph init)
-// //   gtsam::Values estimate;
-// //   estimate.insert(X(key), pose);
+  // Initial estimate - Use pose as estimate (For prior factors at graph init)
+  gtsam::Values estimate;
+  estimate.insert(X(key), pose);
 
-// //   // Add prior factor and update graph
-// //   _newFactors.emplace_shared<gtsam::PriorFactor<gtsam::Pose3>>(X(key), pose, priorNoise);
-// //   _graph->update(_newFactors, estimate);
-// //   _newFactors.resize(0);  // Reset
-// //   incFactorCount();
-// // }
+  // Add prior factor and update graph
+  newFactors_.emplace_shared<gtsam::PriorFactor<gtsam::Pose3>>(X(key), pose, priorNoise);
+  graph_->update(newFactors_, estimate);
+  newFactors_.resize(0);  // Reset
+  incFactorCount();
+}
 
-// // void MaplabIntegrator::addPoseBetweenFactor(const gtsam::Key old_key, const gtsam::Key new_key, const gtsam::Pose3& pose_delta, const gtsam::Pose3& pose_estimate) {
-// //   // Create Pose BetweenFactor
-// //   static auto poseBFNoise = gtsam::noiseModel::Diagonal::Sigmas(_odomNoise);
-// //   gtsam::BetweenFactor<gtsam::Pose3> poseBF(X(old_key), X(new_key), pose_delta, poseBFNoise);
+void GraphManager::addPoseBetweenFactor(const gtsam::Key old_key, const gtsam::Key new_key, const gtsam::Pose3& pose_delta, const gtsam::Pose3& pose_estimate) {
+  // Create Pose BetweenFactor
+  static auto poseBFNoise = gtsam::noiseModel::Diagonal::Sigmas(odomNoise_);
+  gtsam::BetweenFactor<gtsam::Pose3> poseBF(X(old_key), X(new_key), pose_delta, poseBFNoise);
 
-// //   // Pose estimate
-// //   gtsam::Values estimate;
-// //   estimate.insert(X(new_key), pose_estimate);
+  // Pose estimate
+  gtsam::Values estimate;
+  estimate.insert(X(new_key), pose_estimate);
 
-// //   // Add factor and update graph
-// //   _newFactors.add(poseBF);
-// //   _graph->update(_newFactors, estimate);
-// //   _newFactors.resize(0);  // Reset
-// //   incFactorCount();
-// // }
+  // Add factor and update graph
+  newFactors_.add(poseBF);
+  graph_->update(newFactors_, estimate);
+  newFactors_.resize(0);  // Reset
+  incFactorCount();
+}
 
-// // bool MaplabIntegrator::findClosestKeyForTS(const double ts, gtsam::Key* key) const {
-// //   if (key == nullptr || _states.empty()) {
-// //     return false;
-// //   }
-// //   static constexpr double const& eps = 0.2;  // not sure yetsrc/graph_manager.cc
-// //   const double oldest_ts = (*_states.crbegin())->ts() + eps;
-// //   if (ts > oldest_ts) {
-// //     // The requested ts is older than the oldest one in the state vector.
-// //     return false;
-// //   }
-// //   auto comp = [](const StatePtr& lhs, const double ts) { return lhs->ts() + eps < ts; };
-// //   auto it = std::lower_bound(_states.cbegin(), _states.cend(), ts, comp);
-// //   if (it == _states.cend()) {
-// //     return false;
-// //   }
+void GraphManager::updateGraphResults() {
+  // Check if graph has initialized
+  if (first_odom_msg_)
+    return;
 
-// //   *key = (*it)->key();
-// //   return true;
-// // }
+  // Update results
+  gtsam::Values result;
+  std::unordered_map<gtsam::Key, double> keyTimestampMap;
+  auto t_0 = std::chrono::high_resolution_clock::now();
+  {
+    std::lock_guard<std::mutex> lock(graphMutex_);
+    result = graph_->calculateBestEstimate();
+    keyTimestampMap = keyTimestampMap_;  // copy cost 36000 elements(10Hz * 1Hr) ~10ms
+  }
+  auto t_update = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - t_0).count();
 
-// // void MaplabIntegrator::updateGraphResults() {
-// //   // Check if graph has initialized
-// //   if (_firstOdomMsg)
-// //     return;
+  // Publish result at now() timestamp to account for optmization delay
+  // //   ros::Time resultTimestamp = ros::Time::now();
 
-// //   // Update results
-// //   gtsam::Values result;
-// //   std::unordered_map<gtsam::Key, double> keyTimestampMap;
-// //   auto t_0 = std::chrono::high_resolution_clock::now();
-// //   {
-// //     std::lock_guard<std::mutex> lock(_graphMutex);
-// //     result = _graph->calculateBestEstimate();
-// //     keyTimestampMap = _keyTimestampMap;  // copy cost 36000 elements(10Hz * 1Hr) ~10ms
-// //   }
-// //   auto t_update = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - t_0).count();
+  // Clear constraint marker messages
+  // //   _anchorMarkerMsg.header.stamp = resultTimestamp;
+  // _anchorMarkerMsg.points.clear();
+  // //   _absoluteMarkerMsg.header.stamp = resultTimestamp;
+  // _absoluteMarkerMsg.points.clear();
+  // //   _submapMarkerMsg.points.clear();
+  // //   _submapMarkerMsg.colors.clear();
+  // //   _submapMarkerMsg.header.stamp = resultTimestamp;
+  // //   _submapParentMarkerMsg.points.clear();
+  // //   _submapParentMarkerMsg.colors.clear();
+  // //   _submapParentMarkerMsg.header.stamp = resultTimestamp;
+  // //   _submapTextMarkerArrayMsg.markers.clear();
 
-// //   // Publish result at now() timestamp to account for optmization delay
-// //   ros::Time resultTimestamp = ros::Time::now();
+  auto t1 = std::chrono::high_resolution_clock::now();
+  nav_msgs::msg::Path path_msg;
 
-// //   // Clear constraint marker messages
-// //   _anchorMarkerMsg.header.stamp = resultTimestamp;
-// //   _anchorMarkerMsg.points.clear();
-// //   _absoluteMarkerMsg.header.stamp = resultTimestamp;
-// //   _absoluteMarkerMsg.points.clear();
-// //   _submapMarkerMsg.points.clear();
-// //   _submapMarkerMsg.colors.clear();
-// //   _submapMarkerMsg.header.stamp = resultTimestamp;
-// //   _submapParentMarkerMsg.points.clear();
-// //   _submapParentMarkerMsg.colors.clear();
-// //   _submapParentMarkerMsg.header.stamp = resultTimestamp;
-// //   _submapTextMarkerArrayMsg.markers.clear();
+  // Loop through result values - Result in absolute frame
+  T_G_M_ = result.at<gtsam::Pose3>(X(0));
+  const std::size_t n_result = result.size();
+  for (std::size_t i = 0; i < n_result; ++i) {
+    gtsam::Pose3 T_G_B = result.at<gtsam::Pose3>(X(i));
 
-// //   auto t1 = std::chrono::high_resolution_clock::now();
-// //   nav_msgs::Path pathMsg;
+    // Create pose message.
+    geometry_msgs::msg::PoseStamped pose_msg;
+    pose_msg.header.frame_id = config_.world_frame;
+    pose_msg.header.stamp = rclcpp::Time(keyTimestampMap[i]);  // Publish each pose at timestamp corresponding to node in the graph (Note: ts=0 in case of map lookup failure)
+    createPoseMessage(T_G_B, &pose_msg);
+    path_msg.poses.emplace_back(pose_msg);
+  }
 
-// //   // Loop through result values - Result in absolute frame
-// //   _T_G_M = result.at<gtsam::Pose3>(X(0));
-// //   for (std::size_t i = 0; i < result.size(); ++i) {
-// //     gtsam::Pose3 T_G_B = result.at<gtsam::Pose3>(X(i));
+  // Publish Path
+  // if (_pubUpdatedPath.getNumSubscribers() > 0) {
+  //     pathMsg.header.frame_id = _world_frame;
+  //     pathMsg.header.stamp = resultTimestamp;
+  //     _pubUpdatedPath.publish(pathMsg);
+  //   }
 
-// //     // Create pose message.
-// //     geometry_msgs::PoseStamped poseMsg;
-// //     poseMsg.header.frame_id = _world_frame;
-// //     poseMsg.header.seq = i;
-// //     poseMsg.header.stamp = ros::Time(keyTimestampMap[i]);  // Publish each pose at timestamp corresponding to node in the graph (Note: ts=0 in case of map lookup failure)
-// //     createPoseMessage(T_G_B, &poseMsg);
-// //     pathMsg.poses.emplace_back(poseMsg);
+  // Update last optimzed pose
+  T_G_B_opt_ = result.at<gtsam::Pose3>(X(result.size() - 1));
 
-// //     // Create Constraint Markers
-// //     if (_pubConstraintMarkers.getNumSubscribers() > 0) {
-// //       // Anchors - Check if current key has anchor attached
-// //       auto anchor_itr = _keyAnchorPoseMap.find(i);
-// //       if (anchor_itr != _keyAnchorPoseMap.end()) {
-// //         geometry_msgs::Point p;
-// //         p.x = anchor_itr->second.translation().x();
-// //         p.y = anchor_itr->second.translation().y();
-// //         p.z = anchor_itr->second.translation().z();
-// //         _anchorMarkerMsg.points.push_back(p);
-// //       }
-
-// //       // Submap constraints - Check if current key is a parent node for a submap constraint
-// //       auto parent_itr = _submapParentChildKeyMap.find(i);
-// //       if (parent_itr != _submapParentChildKeyMap.end()) {
-// //         // Get parent pose
-// //         gtsam::Pose3 parent_pose = result.at<gtsam::Pose3>(X(i));
-// //         geometry_msgs::Point parent_pt;
-// //         parent_pt.x = parent_pose.translation().x();
-// //         parent_pt.y = parent_pose.translation().y();
-// //         parent_pt.z = parent_pose.translation().z();
-// //         // Create color for constraints
-// //         static int max_key = 5000;
-// //         if (i > max_key)
-// //           max_key = max_key * 2.0f;
-// //         float val = float(i) * 255.0 / float(max_key);
-// //         std_msgs::ColorRGBA color;
-// //         color.r = std::round(std::sin(0.024 * val + 0) * 127 + 128) / 255.0;
-// //         color.g = std::round(std::sin(0.024 * val + 2) * 127 + 128) / 255.0;
-// //         color.b = std::round(std::sin(0.024 * val + 4) * 127 + 128) / 255.0;
-// //         color.a = 1.0f;
-// //         // Parent node sphere marker
-// //         _submapParentMarkerMsg.points.push_back(parent_pt);
-// //         _submapParentMarkerMsg.colors.push_back(color);
-// //         // Parent node constraint number text marker
-// //         if (_pubConstraintTextMarkers.getNumSubscribers() > 0) {
-// //           _submapTextMarkerMsg.header.stamp = resultTimestamp;
-// //           _submapTextMarkerMsg.id = i;
-// //           _submapTextMarkerMsg.pose.position.x = parent_pt.x;
-// //           _submapTextMarkerMsg.pose.position.y = parent_pt.y;
-// //           _submapTextMarkerMsg.pose.position.z = parent_pt.z + 0.25f;
-// //           _submapTextMarkerMsg.text = std::to_string(parent_itr->second.size());
-// //           _submapTextMarkerArrayMsg.markers.push_back(_submapTextMarkerMsg);
-// //         }
-// //         // Loop through children
-// //         for (const auto& childKey : parent_itr->second) {
-// //           // Get Child pose
-// //           gtsam::Pose3 child_pose = result.at<gtsam::Pose3>(X(childKey));
-// //           geometry_msgs::Point child_pt;
-// //           child_pt.x = child_pose.translation().x();
-// //           child_pt.y = child_pose.translation().y();
-// //           child_pt.z = child_pose.translation().z();
-// //           // Add parent and child points to marker msg
-// //           _submapMarkerMsg.points.push_back(parent_pt);
-// //           _submapMarkerMsg.points.push_back(child_pt);
-// //           _submapMarkerMsg.colors.push_back(color);
-// //           _submapMarkerMsg.colors.push_back(color);
-// //         }
-// //       }
-// //     }
-// //   }
-
-// //   // Publish Path
-// //   if (_pubUpdatedPath.getNumSubscribers() > 0) {
-// //     pathMsg.header.frame_id = _world_frame;
-// //     pathMsg.header.stamp = resultTimestamp;
-// //     _pubUpdatedPath.publish(pathMsg);
-// //   }
-
-// //   // Publish Constraint Markers
-// //   if (_pubConstraintMarkers.getNumSubscribers() > 0) {
-// //     if (!_anchorMarkerMsg.points.empty()) {
-// //       _pubConstraintMarkers.publish(_anchorMarkerMsg);
-// //     }
-// //     if (!_absoluteMarkerMsg.points.empty()) {
-// //       _pubConstraintMarkers.publish(_absoluteMarkerMsg);
-// //     }
-// //     if (!_submapMarkerMsg.points.empty()) {
-// //       _pubConstraintMarkers.publish(_submapMarkerMsg);
-// //     }
-// //     if (!_submapParentMarkerMsg.points.empty()) {
-// //       _pubConstraintMarkers.publish(_submapParentMarkerMsg);
-// //     }
-// //   }
-// //   if (_pubConstraintTextMarkers.getNumSubscribers() > 0)
-// //     _pubConstraintTextMarkers.publish(_submapTextMarkerArrayMsg);
-
-// //   // Update last optimzed pose
-// //   _T_G_B_opt = result.at<gtsam::Pose3>(X(result.size() - 1));
-
-// //   // DEBUG
-// //   auto t2 = std::chrono::high_resolution_clock::now();
-// //   if (_verbose) {
-// //     logger.logInfo("\033[36mGRAPH UPDATE\033[0m - time(us):" << t_update << ", Map Build(ms): " << std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count());
-// //     logger.logInfo("\033[36mGRAPH UPDATE\033[0m - number of factors: " << _factor_count);
-// //   }
-// //   // DEBUG
-// // }
+  auto t2 = std::chrono::high_resolution_clock::now();
+  if (config_.verbose > 1) {
+    auto logger = GraphManagerLogger::getInstance();
+    logger.logInfo("\033[36mGRAPH UPDATE\033[0m - time(us):" + std::to_string(t_update) + ", Map Build(ms): " + std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count()));
+    logger.logInfo("\033[36mGRAPH UPDATE\033[0m - number of factors: " + std::to_string(factor_count_));
+  }
+}
 
 // // void MaplabIntegrator::publishTransforms(const ros::Time& ts) {
 // //   // Absolute(DARPA)-to-RobotMap
@@ -791,31 +677,20 @@ void GraphManager::odometryCallback(nav_msgs::msg::Odometry const& odom) {
 // //   }
 // // }
 
-// // bool MaplabIntegrator::createPoseMessage(const gtsam::Pose3& pose, geometry_msgs::PoseStamped* poseMsg) const {
-// //   if (poseMsg == nullptr) {
-// //     return false;
-// //   }
-// //   poseMsg->pose.position.x = pose.translation().x();
-// //   poseMsg->pose.position.y = pose.translation().y();
-// //   poseMsg->pose.position.z = pose.translation().z();
-// //   poseMsg->pose.orientation.x = pose.rotation().toQuaternion().x();
-// //   poseMsg->pose.orientation.y = pose.rotation().toQuaternion().y();
-// //   poseMsg->pose.orientation.z = pose.rotation().toQuaternion().z();
-// //   poseMsg->pose.orientation.w = pose.rotation().toQuaternion().w();
+bool GraphManager::createPoseMessage(const gtsam::Pose3& pose, geometry_msgs::msg::PoseStamped* pose_msg) const {
+  if (pose_msg == nullptr) {
+    return false;
+  }
+  pose_msg->pose.position.x = pose.translation().x();
+  pose_msg->pose.position.y = pose.translation().y();
+  pose_msg->pose.position.z = pose.translation().z();
+  pose_msg->pose.orientation.x = pose.rotation().toQuaternion().x();
+  pose_msg->pose.orientation.y = pose.rotation().toQuaternion().y();
+  pose_msg->pose.orientation.z = pose.rotation().toQuaternion().z();
+  pose_msg->pose.orientation.w = pose.rotation().toQuaternion().w();
 
-// //   return true;
-// // }
-
-// // void MaplabIntegrator::convertTransfromToPose(const geometry_msgs::TransformStamped& t, geometry_msgs::PoseStamped& p) {
-// //   // Header
-// //   p.header = t.header;
-// //   // Translation
-// //   p.pose.position.x = t.transform.translation.x;
-// //   p.pose.position.y = t.transform.translation.y;
-// //   p.pose.position.z = t.transform.translation.z;
-// //   // Rotation
-// //   p.pose.orientation = t.transform.rotation;
-// // }
+  return true;
+}
 
 // // void MaplabIntegrator::updateKeySubmapFactorIdxMap(const gtsam::Key parent_key, const gtsam::Key child_key) {
 // //   size_t factor_idx = getFactorCount() - 1;

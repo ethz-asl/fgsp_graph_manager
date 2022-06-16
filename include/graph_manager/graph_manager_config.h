@@ -24,8 +24,14 @@ struct GraphManagerConfig {
   std::vector<double> anchor_noise_std = {0.001, 0.001, 0.001, 0.001, 0.001, 0.001};  // rad,rad,rad,m,m,m;
 
   std::string odom_topic = "/odometry";
+  double update_interval_s = 10.0;  // Update interval at which the graph is optimized (seconds)
+
+  // Extrinsic calibrations
+  std::vector<double> T_O_B = {1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0};
+  std::vector<double> T_B_C = {1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0};
 
   static GraphManagerConfig* init(rclcpp::Node& node);
+  bool isValid() const;
 };
 
 }  // namespace fgsp

@@ -10,6 +10,11 @@ GraphManagerNode::GraphManagerNode()
   logger.logInfo("Initializing Graph Manager...");
 
   config_.reset(fgsp::GraphManagerConfig::init(*this));
+  if (!config_->isValid()) {
+    logger.logError("Invalid configuration. Aborting.");
+    return;
+  }
+
   manager_ = std::make_unique<fgsp::GraphManager>(*config_);
 
   odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
