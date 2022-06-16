@@ -47,7 +47,7 @@ class GraphManager {
   //   void cloudCallback(int key, const sensor_msgs::PointCloud2ConstPtr& cloudPtr);
   //   void absolutePoseCallback(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr& posePtr);
   //   void maplabAnchorCallback(const nav_msgs::Path::ConstPtr& pathPtr);
-  //   void maplabSubmapCallback(const nav_msgs::Path::ConstPtr& pathPtr);
+  void processRelativeConstraints(nav_msgs::msg::Path const& path);
 
   // Get State key
   auto stateKey() const -> gtsam::Key { return state_key_; }
@@ -59,8 +59,6 @@ class GraphManager {
   void addPoseBetweenFactor(const gtsam::Key old_key, const gtsam::Key new_key, const gtsam::Pose3& pose_delta, const gtsam::Pose3& pose_estimate);
   //   //Update ISAM graph
   void updateGraphResults();
-  //   //Publish associated transforms
-  //   void publishTransforms(const ros::Time& ts);
 
   //   //Utility methods
   bool createPoseMessage(const gtsam::Pose3& pose, geometry_msgs::msg::PoseStamped* pose_msg) const;
@@ -68,8 +66,8 @@ class GraphManager {
   //   //Lookup maps for key-factor association
   //   void updateKeyAnchorFactorIdxMap(const gtsam::Key key) { _keyAnchorFactorIdxMap[key] = factor_count_ - 1; }
   //   void updateKeyAnchorPoseMap(const gtsam::Key key, const gtsam::Pose3& pose) { _keyAnchorPoseMap[key] = pose; }
-  //   void updateKeySubmapFactorIdxMap(const gtsam::Key parent_key, const gtsam::Key child_key);
-  //   int findSubmapFactorIdx(const gtsam::Key parent_key, const gtsam::Key child_key, bool erase = false);
+  void updateKeySubmapFactorIdxMap(const gtsam::Key parent_key, const gtsam::Key child_key);
+  int findSubmapFactorIdx(const gtsam::Key parent_key, const gtsam::Key child_key, bool erase = false);
 
   //   //Factor count increment and retreivel
   void incFactorCount() { ++factor_count_; }
@@ -120,34 +118,34 @@ class GraphManager {
   gtsam::Pose3 T_G_B_inc_;  // IMU to DARPA(G) - incremental
 
   // Factor graph
-  std::size_t factor_count_ = 0;            // Counter for Total factors (existing + removed)
-  std::mutex graphMutex_;                   // For adding new factors and graph update
-  gtsam::ISAM2Params params_;               // Graph parameters
-  gtsam::NonlinearFactorGraph newFactors_;  // New factors to be added to the graph
-  std::shared_ptr<gtsam::ISAM2> graph_;     // iSAM2 GRAPH object
-  gtsam::Key state_key_ = 0;                // Current state key
-                                            // std::vector<StatePtr> _states;  // Vecotr of states //TODO deprecate
+  std::size_t factor_count_ = 0;             // Counter for Total factors (existing + removed)
+  std::mutex graph_mutex_;                   // For adding new factors and graph update
+  gtsam::ISAM2Params params_;                // Graph parameters
+  gtsam::NonlinearFactorGraph new_factors_;  // New factors to be added to the graph
+  std::shared_ptr<gtsam::ISAM2> graph_;      // iSAM2 GRAPH object
+  gtsam::Key state_key_ = 0;                 // Current state key
+                                             // std::vector<StatePtr> _states;  // Vecotr of states //TODO deprecate
 
   // Factor noise vectors - ORDER RPY(rad) - XYZ(meters)
-  gtsam::Vector6 odomNoise_;      // Odometry BetweenFactor Noise
-  gtsam::Vector6 absoluteNoise_;  // Absolute(AprilTag) PriorFactor Noise
-  gtsam::Vector6 submapNoise_;    // Submap BetweenFactor Noise
-  gtsam::Vector6 anchorNoise_;    // Anchor PriorFactor Noise
+  gtsam::Vector6 odom_noise_;      // Odometry BetweenFactor Noise
+  gtsam::Vector6 absolute_noise_;  // Absolute(AprilTag) PriorFactor Noise
+  gtsam::Vector6 submap_noise_;    // Submap BetweenFactor Noise
+  gtsam::Vector6 anchor_noise_;    // Anchor PriorFactor Noise
 
   // Odometry factor
   bool first_odom_msg_ = true;
   gtsam::Pose3 last_IMU_pose_;
 
   // Absolute pose factor
-  bool firstAbsolutePose_ = true;
+  bool first_absolute_pose_ = true;
 
   // Lookup map objects for key-to-factorIndex associations
-  std::unordered_map<double, gtsam::Key> timestampKeyMap_;                        // Timestamp-Key map for lookup of keys corresponding to odometry timestamps
-  std::unordered_map<gtsam::Key, double> keyTimestampMap_;                        // Key-Timestamp map used for publishing graph node timestamps for path message publishing
-  std::unordered_map<gtsam::Key, size_t> keyAnchorFactorIdxMap_;                  // Key-PriorFactorIndex map for lookup of indices of prior factor add at key for Anchor poses
-  std::unordered_map<gtsam::Key, gtsam::Pose3> keyAnchorPoseMap_;                 // Key-AnchorPose map for lookup of applied anchor pose as prior factor at Key
-  std::unordered_map<gtsam::Key, std::set<size_t>> keySubmapFactorIdxMap_;        // Key-SubmapBetweenFactorIndex map for lookup of indices of betweenfactor added at key for Submap constraints
-  std::unordered_map<gtsam::Key, std::set<gtsam::Key>> submapParentChildKeyMap_;  // Parent-Child keys for visualization of relative submap constrinats
+  std::unordered_map<double, gtsam::Key> timestamp_key_map_;                          // Timestamp-Key map for lookup of keys corresponding to odometry timestamps
+  std::unordered_map<gtsam::Key, double> key_timestamp_map_;                          // Key-Timestamp map used for publishing graph node timestamps for path message publishing
+  std::unordered_map<gtsam::Key, size_t> keyAnchorFactorIdxMap_;                      // Key-PriorFactorIndex map for lookup of indices of prior factor add at key for Anchor poses
+  std::unordered_map<gtsam::Key, gtsam::Pose3> keyAnchorPoseMap_;                     // Key-AnchorPose map for lookup of applied anchor pose as prior factor at Key
+  std::unordered_map<gtsam::Key, std::set<size_t>> key_submap_factor_idx_map_;        // Key-SubmapBetweenFactorIndex map for lookup of indices of betweenfactor added at key for Submap constraints
+  std::unordered_map<gtsam::Key, std::set<gtsam::Key>> submap_parent_child_key_map_;  // Parent-Child keys for visualization of relative submap constrinats
 
   //   //Timer-based map/result update and publish
   //   double _updateResultsInterval = 30.0;  //Interval (seconds) for graph update callback

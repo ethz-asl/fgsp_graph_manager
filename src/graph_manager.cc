@@ -23,18 +23,18 @@ GraphManager::GraphManager(GraphManagerConfig const& config,
   logger.logInfo("GraphManager - Camera Frame: " + config.camera_frame);
   logger.logInfo("GraphManager - IMU Frame: " + config.imu_frame);
 
-  odomNoise_ = Eigen::Map<const Eigen::Matrix<double, 6, 1>>(config.odom_noise_std.data());
-  absoluteNoise_ = Eigen::Map<const Eigen::Matrix<double, 6, 1>>(config.absolute_noise_std.data());
-  submapNoise_ = Eigen::Map<const Eigen::Matrix<double, 6, 1>>(config.submap_noise_std.data());
-  anchorNoise_ = Eigen::Map<const Eigen::Matrix<double, 6, 1>>(config.anchor_noise_std.data());
+  odom_noise_ = Eigen::Map<const Eigen::Matrix<double, 6, 1>>(config.odom_noise_std.data());
+  absolute_noise_ = Eigen::Map<const Eigen::Matrix<double, 6, 1>>(config.absolute_noise_std.data());
+  submap_noise_ = Eigen::Map<const Eigen::Matrix<double, 6, 1>>(config.submap_noise_std.data());
+  anchor_noise_ = Eigen::Map<const Eigen::Matrix<double, 6, 1>>(config.anchor_noise_std.data());
 
   // TODO(lbern): Move to logger
   Eigen::IOFormat clean_fmt(4, 0, ", ", "\n", "[", "]");
   std::stringstream ss;
-  ss << "GraphManager - Odometry Factor Noise: " << odomNoise_.transpose().format(clean_fmt) << "\n"
-     << "GraphManager - Absolute Factor Noise: " << absoluteNoise_.transpose().format(clean_fmt) << "\n"
-     << "GraphManager - Submap Factor Noise: " << submapNoise_.transpose().format(clean_fmt) << "\n"
-     << "GraphManager - Anchor Factor Noise: " << anchorNoise_.transpose().format(clean_fmt) << "\n";
+  ss << "GraphManager - Odometry Factor Noise: " << odom_noise_.transpose().format(clean_fmt) << "\n"
+     << "GraphManager - Absolute Factor Noise: " << absolute_noise_.transpose().format(clean_fmt) << "\n"
+     << "GraphManager - Submap Factor Noise: " << submap_noise_.transpose().format(clean_fmt) << "\n"
+     << "GraphManager - Anchor Factor Noise: " << anchor_noise_.transpose().format(clean_fmt) << "\n";
   logger.logInfo(ss.str());
 
   auto T_O_B = Eigen::Map<const Eigen::Matrix<double, 4, 4>>(config.T_O_B.data());
@@ -86,7 +86,7 @@ void GraphManager::odometryCallback(nav_msgs::msg::Odometry const& odom) {
   auto t1 = std::chrono::high_resolution_clock::now();
   {
     // If first lidar odometry message has been received
-    std::lock_guard<std::mutex> lock(graphMutex_);
+    std::lock_guard<std::mutex> lock(graph_mutex_);
     if (first_odom_msg_) {
       // Initialize - Add temporary identity prior factor
       new_key = stateKey();
@@ -102,8 +102,8 @@ void GraphManager::odometryCallback(nav_msgs::msg::Odometry const& odom) {
       addPoseBetweenFactor(old_key, new_key, T_B1_B2, T_G_B);
     }
     // Update Timestamp-Key & Key-Timestamp Map
-    timestampKeyMap_[ts] = new_key;
-    keyTimestampMap_[new_key] = ts;
+    timestamp_key_map_[ts] = new_key;
+    key_timestamp_map_[new_key] = ts;
     // Get updated result
     T_G_B_inc_ = graph_->calculateEstimate<gtsam::Pose3>(X(new_key));
   }
@@ -154,15 +154,15 @@ void GraphManager::odometryCallback(nav_msgs::msg::Odometry const& odom) {
 // //   {
 // //     std::lock_guard<std::mutex> lock(_graphMutex);
 // //     auto t1 = std::chrono::high_resolution_clock::now();
-// //     gtsam::FactorIndices removeFactorIdx;
+// //     gtsam::FactorIndices remove_factor_idx;
 // //     for (const geometry_msgs::PoseStamped& pose_msg : pathPtr->poses) {
 // //       // Update timestamp
 // //       const double ts = pose_msg.header.stamp.toSec();
 
 // //       // Find corresponding key in graph
 // //       gtsam::Key key;
-// //       auto key_itr = _timestampKeyMap.find(ts);
-// //       if (key_itr != _timestampKeyMap.end()) {
+// //       auto key_itr = timestamp_key_map_.find(ts);
+// //       if (key_itr != timestamp_key_map_.end()) {
 // //         key = key_itr->second;  // Save Key
 // //       } else {
 // //         if (_verbose) logger.logInfo("\033[36mANCHOR\033[0m - Found no closest key for ts: :" << ros::Time(ts));
@@ -199,7 +199,7 @@ void GraphManager::odometryCallback(nav_msgs::msg::Odometry const& odom) {
 // //                                                                             << ", ts: " << ros::Time(ts)
 // //                                                                             << ", Equal: \033[31mNO\033[0m"
 // //                                                                             << ", Removing Prior with Index: " << itr->second);
-// //         removeFactorIdx.push_back(itr->second);
+// //         remove_factor_idx.push_back(itr->second);
 // //       } else if (_verbose)
 // //         logger.logInfo("\033[36mANCHOR\033[0m - Found Key: " << key
 // //                                                               << ", ts: " << ros::Time(ts)
@@ -209,7 +209,7 @@ void GraphManager::odometryCallback(nav_msgs::msg::Odometry const& odom) {
 // //       // Update graph
 // //       static auto anchorNoise = gtsam::noiseModel::Diagonal::Sigmas(_anchorNoise);
 // //       _newFactors.emplace_shared<gtsam::PriorFactor<gtsam::Pose3>>(X(key), T_G_B, anchorNoise);
-// //       _graph->update(_newFactors, gtsam::Values(), removeFactorIdx);
+// //       _graph->update(_newFactors, gtsam::Values(), remove_factor_idx);
 // //       _newFactors.resize(0);  // Reset
 // //       incFactorCount();
 
@@ -222,69 +222,72 @@ void GraphManager::odometryCallback(nav_msgs::msg::Odometry const& odom) {
 // //   }
 // // }
 
-// // void MaplabIntegrator::maplabSubmapCallback(const nav_msgs::Path::ConstPtr& pathPtr) {
-// //   // Check if empty message
-// //   if (pathPtr == nullptr || _firstOdomMsg) {
-// //     logger.logInfo("MaplabIntegrator - nullptr passed to Submap callback or graph not initialized from odometry yet");
-// //     return;
-// //   }
+void GraphManager::processRelativeConstraints(nav_msgs::msg::Path const& path) {
+  auto const& logger = GraphManagerLogger::getInstance();
+  // Check if empty message
+  if (first_odom_msg_) {
+    logger.logInfo("MaplabIntegrator - nullptr passed to Submap callback or graph not initialized from odometry yet");
+    return;
+  }
 
-// //   // Find corresponding parent key in graph
-// //   const auto& parent_ts = pathPtr->header.stamp.toSec();
-// //   {
-// //     std::lock_guard<std::mutex> lock(_graphMutex);
-// //     auto parent_itr = _timestampKeyMap.find(parent_ts);
-// //     if (parent_itr != _timestampKeyMap.end()) {
-// //       gtsam::Key parent_key = parent_itr->second;
-// //       // Loop through submap(parent)-submap(child) constraints
-// //       auto t1 = std::chrono::high_resolution_clock::now();
-// //       for (size_t i = 0; i < pathPtr->poses.size(); ++i) {
-// //         const auto& child_ts = pathPtr->poses[i].header.stamp.toSec();
-// //         // Check if child is associated to a key
-// //         auto child_itr = _timestampKeyMap.find(child_ts);
-// //         if (child_itr != _timestampKeyMap.end()) {
-// //           gtsam::Key child_key = child_itr->second;
-// //           // std::cout << std::fixed << ", Child Key : " << child_key << ", ts: " << child_ts << std::endl;
+  // Find corresponding parent key in graph
+  const auto& parent_ts = path.header.stamp.sec;
+  {
+    std::lock_guard<std::mutex> lock(graph_mutex_);
+    auto parent_itr = timestamp_key_map_.find(parent_ts);
+    if (parent_itr != timestamp_key_map_.end()) {
+      gtsam::Key parent_key = parent_itr->second;
+      // Loop through submap(parent)-submap(child) constraints
+      auto t1 = std::chrono::high_resolution_clock::now();
+      const std::size_t n_poses = path.poses.size();
+      for (size_t i = 0; i < n_poses; ++i) {
+        const auto& child_ts = path.poses[i].header.stamp.sec;
 
-// //           // Skip if keys are same
-// //           if (child_key == parent_key) {
-// //             if (_verbose) logger.logInfo("MaplabIntegrator - Same Submap Parent/Child keys, key:" << child_key);
-// //             continue;
-// //           }
+        // Check if child is associated to a key
+        auto child_itr = timestamp_key_map_.find(child_ts);
+        if (child_itr != timestamp_key_map_.end()) {
+          gtsam::Key child_key = child_itr->second;
+          // std::cout << std::fixed << ", Child Key : " << child_key << ", ts: " << child_ts << std::endl;
 
-// //           // Check if a previous BetweenFactor exists between two keys
-// //           gtsam::FactorIndices removeFactorIdx;
-// //           int rmIdx = findSubmapFactorIdx(parent_key, child_key, true);
-// //           if (rmIdx != -1)
-// //             removeFactorIdx.push_back(rmIdx);
+          // Skip if keys are same
+          if (child_key == parent_key) {
+            if (config_.verbose > 0) logger.logInfo("GraphManager - Same Submap Parent/Child keys, key:" + std::to_string(child_key));
+            continue;
+          }
 
-// //           // Add submap-submap BetweenFactor
-// //           static auto submapNoise = gtsam::noiseModel::Diagonal::Sigmas(_submapNoise);
-// //           const auto& p = pathPtr->poses[i].pose;
-// //           gtsam::Pose3 T_B1B2(gtsam::Rot3(p.orientation.w, p.orientation.x, p.orientation.y, p.orientation.z),
-// //                               gtsam::Point3(p.position.x, p.position.y, p.position.z));
-// //           gtsam::BetweenFactor<gtsam::Pose3> submapBF(X(parent_key), X(child_key), T_B1B2, submapNoise);
-// //           _newFactors.add(submapBF);
-// //           // Update Graph
-// //           _graph->update(_newFactors, gtsam::Values(), removeFactorIdx);
-// //           _newFactors.resize(0);
-// //           incFactorCount();
-// //           updateKeySubmapFactorIdxMap(parent_key, child_key);
-// //           if (_verbose) logger.logInfo("\033[34mSUBMAP\033[0m - " << (rmIdx == -1 ? "Added" : "Replaced") << ": P(" << parent_key << ")-C(" << child_key << "), delta_t(x,y,z):" << T_B1B2.translation().transpose());
-// //         } else
-// //           continue;
-// //       }
-// //       auto t2 = std::chrono::high_resolution_clock::now();
+          // Check if a previous BetweenFactor exists between two keys
+          gtsam::FactorIndices remove_factor_idx;
+          int rmIdx = findSubmapFactorIdx(parent_key, child_key, true);
+          if (rmIdx != -1)
+            remove_factor_idx.push_back(rmIdx);
 
-// //       // DEBUG
-// //       if (_verbose) logger.logInfo("\033[34mSUBMAP-UPDATE\033[0m - Constraints added: " << pathPtr->poses.size() << ", time(ms): " << std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count());
-// //       // DEBUG
-// //     } else {
-// //       if (_verbose) logger.logInfo("\033[34mSUBMAP\033[0m  - Found no key for parent at ts: " << ros::Time(parent_ts) << " --- SKIPPING CHILDERN ---");
-// //       return;
-// //     }
-// //   }
-// // }
+          // Add submap-submap BetweenFactor
+          static auto submapNoise = gtsam::noiseModel::Diagonal::Sigmas(submap_noise_);
+          const auto& p = path.poses[i].pose;
+          gtsam::Pose3 T_B1B2(gtsam::Rot3(p.orientation.w, p.orientation.x, p.orientation.y, p.orientation.z),
+                              gtsam::Point3(p.position.x, p.position.y, p.position.z));
+          gtsam::BetweenFactor<gtsam::Pose3> submapBF(X(parent_key), X(child_key), T_B1B2, submapNoise);
+          new_factors_.add(submapBF);
+          // Update Graph
+          graph_->update(new_factors_, gtsam::Values(), remove_factor_idx);
+          new_factors_.resize(0);
+          incFactorCount();
+          updateKeySubmapFactorIdxMap(parent_key, child_key);
+          if (config_.verbose > 0) logger.logInfo("\033[34mSUBMAP\033[0m - : P(" + std::to_string(parent_key) + ")-C(" + std::to_string(child_key));
+        } else
+          continue;
+      }
+      auto t2 = std::chrono::high_resolution_clock::now();
+
+      // DEBUG
+      if (config_.verbose > 0) logger.logInfo("\033[34mSUBMAP-UPDATE\033[0m - Constraints added: " + std::to_string(n_poses) + ", time(ms): " + std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count()));
+      // DEBUG
+    } else {
+      if (config_.verbose > 0) logger.logInfo("\033[34mSUBMAP\033[0m  - Found no key for parent at ts: " + std::to_string(parent_ts) + " --- SKIPPING CHILDERN ---");
+      return;
+    }
+  }
+}
 
 void GraphManager::addPriorFactor(const gtsam::Key key, const gtsam::Pose3& pose) {
   if (graph_ == nullptr) {
@@ -300,9 +303,9 @@ void GraphManager::addPriorFactor(const gtsam::Key key, const gtsam::Pose3& pose
   estimate.insert(X(key), pose);
 
   // Add prior factor and update graph
-  newFactors_.emplace_shared<gtsam::PriorFactor<gtsam::Pose3>>(X(key), pose, priorNoise);
-  graph_->update(newFactors_, estimate);
-  newFactors_.resize(0);  // Reset
+  new_factors_.emplace_shared<gtsam::PriorFactor<gtsam::Pose3>>(X(key), pose, priorNoise);
+  graph_->update(new_factors_, estimate);
+  new_factors_.resize(0);  // Reset
   incFactorCount();
 }
 
@@ -313,7 +316,7 @@ void GraphManager::addPoseBetweenFactor(const gtsam::Key old_key, const gtsam::K
     return;
   }
   // Create Pose BetweenFactor
-  static auto poseBFNoise = gtsam::noiseModel::Diagonal::Sigmas(odomNoise_);
+  static auto poseBFNoise = gtsam::noiseModel::Diagonal::Sigmas(odom_noise_);
   gtsam::BetweenFactor<gtsam::Pose3> poseBF(X(old_key), X(new_key), pose_delta, poseBFNoise);
 
   // Pose estimate
@@ -321,9 +324,9 @@ void GraphManager::addPoseBetweenFactor(const gtsam::Key old_key, const gtsam::K
   estimate.insert(X(new_key), pose_estimate);
 
   // Add factor and update graph
-  newFactors_.add(poseBF);
-  graph_->update(newFactors_, estimate);
-  newFactors_.resize(0);  // Reset
+  new_factors_.add(poseBF);
+  graph_->update(new_factors_, estimate);
+  new_factors_.resize(0);  // Reset
   incFactorCount();
 }
 
@@ -337,9 +340,9 @@ void GraphManager::updateGraphResults() {
   std::unordered_map<gtsam::Key, double> keyTimestampMap;
   auto t_0 = std::chrono::high_resolution_clock::now();
   {
-    std::lock_guard<std::mutex> lock(graphMutex_);
+    std::lock_guard<std::mutex> lock(graph_mutex_);
     result = graph_->calculateBestEstimate();
-    keyTimestampMap = keyTimestampMap_;  // copy cost 36000 elements(10Hz * 1Hr) ~10ms
+    keyTimestampMap = key_timestamp_map_;  // copy cost 36000 elements(10Hz * 1Hr) ~10ms
   }
   auto t_update = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - t_0).count();
 
@@ -391,47 +394,43 @@ bool GraphManager::createPoseMessage(const gtsam::Pose3& pose, geometry_msgs::ms
   return true;
 }
 
-// // void MaplabIntegrator::updateKeySubmapFactorIdxMap(const gtsam::Key parent_key, const gtsam::Key child_key) {
-// //   size_t factor_idx = getFactorCount() - 1;
-// //   _keySubmapFactorIdxMap[parent_key].emplace(factor_idx);
-// //   _keySubmapFactorIdxMap[child_key].emplace(factor_idx);
+void GraphManager::updateKeySubmapFactorIdxMap(const gtsam::Key parent_key, const gtsam::Key child_key) {
+  const std::size_t factor_idx = getFactorCount() - 1u;
+  key_submap_factor_idx_map_[parent_key].emplace(factor_idx);
+  key_submap_factor_idx_map_[child_key].emplace(factor_idx);
 
-// //   // Save Parent-Child keys for visualization
-// //   _submapParentChildKeyMap[parent_key].emplace(child_key);
-// //   // DEBUG
-// //   //  std::cout << "\033[34mSUBMAP\033[0m NEW Factor added at Index: " << factor_idx << ", between keys: " << parent_key << "/" << child_key << std::endl;
-// // }
+  // Save Parent-Child keys for visualization
+  submap_parent_child_key_map_[parent_key].emplace(child_key);
+  // DEBUG
+  //  std::cout << "\033[34mSUBMAP\033[0m NEW Factor added at Index: " << factor_idx << ", between keys: " << parent_key << "/" << child_key << std::endl;
+}
 
-// // int MaplabIntegrator::findSubmapFactorIdx(const gtsam::Key parent_key, const gtsam::Key child_key, bool erase) {
-// //   // Get sets of constraint indices at graph keys
-// //   auto& p_set = _keySubmapFactorIdxMap[parent_key];
-// //   auto& c_set = _keySubmapFactorIdxMap[child_key];
+int GraphManager::findSubmapFactorIdx(const gtsam::Key parent_key, const gtsam::Key child_key, bool erase) {
+  // Get sets of constraint indices at graph keys
+  auto& p_set = key_submap_factor_idx_map_[parent_key];
+  auto& c_set = key_submap_factor_idx_map_[child_key];
 
-// //   // Find common constraint index between two graph Keys i.e. a BetweenFactor should have same factor index at two graph keys(nodes)
-// //   std::set<size_t> result;
-// //   std::set_intersection(p_set.begin(), p_set.end(),
-// //                         c_set.begin(), c_set.end(),
-// //                         std::inserter(result, result.begin()));
+  // Find common constraint index between two graph Keys i.e. a BetweenFactor should have same factor index at two graph keys(nodes)
+  std::set<std::size_t> result;
+  std::set_intersection(p_set.begin(), p_set.end(),
+                        c_set.begin(), c_set.end(),
+                        std::inserter(result, result.begin()));
 
-// //   // Check if success
-// //   int output = -1;
-// //   if (result.size() == 1) {
-// //     output = *result.begin();
+  // Check if success
+  int output = -1;
+  if (result.size() == 1) {
+    output = *result.begin();
 
-// //     // Remove common constraint indices from both sets
-// //     if (erase) {
-// //       p_set.erase(output);
-// //       c_set.erase(output);
-// //     }
-// //   } else if (result.size() > 1) {
-// //     logger.logInfo("MaplabIntegrator - Submaps connected by mutliple between factors");
-// //     std::cout << "Indices found: ";
-// //     for (auto& e : result)
-// //       std::cout << e << " ";
-// //     std::cout << ", between keys: " << parent_key << "/" << child_key << std::endl;
-// //   }
+    // Remove common constraint indices from both sets
+    if (erase) {
+      p_set.erase(output);
+      c_set.erase(output);
+    }
+  } else if (result.size() > 1) {
+    GraphManagerLogger::getInstance().logInfo("GraphManager - Submaps connected by mutliple between factors");
+  }
 
-// //   return output;
-// // }
+  return output;
+}
 
 }  // namespace fgsp
