@@ -362,6 +362,7 @@ void GraphManager::updateGraphResults() {
 
   // Publish Path
   path_msg.header.frame_id = "map";
+  path_msg.header.stamp = publisher_.getTimeNow();
   publisher_.publish(path_msg, "/optimized_path");
 
   // Update last optimzed pose

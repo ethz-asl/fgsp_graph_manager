@@ -20,6 +20,8 @@ class GraphManagerPublisher {
     publisher->publish(msg);
   }
 
+  rclcpp::Time getTimeNow() const;
+
  private:
   rclcpp::Node& node_;
   std::map<std::string, std::shared_ptr<rclcpp::PublisherBase>> publishers_;
