@@ -1,11 +1,11 @@
 #ifndef GRAPH_STATE_HPP_
 #define GRAPH_STATE_HPP_
 
-//C++
+// C++
 #include <memory>
 #include <mutex>
 
-//GTSAM
+// GTSAM
 #include <gtsam/navigation/ImuBias.h>
 #include <gtsam/navigation/NavState.h>
 
@@ -25,8 +25,8 @@ class State {
       : key_(key), ts_(ts), navState_(navState) {}
   State(const State& other)
       : key_(other.key_), ts_(other.ts_), navState_(other.navState_), imuBias_(other.imuBias_) {}
-  
-  //Overload assignment operator
+
+  // Overload assignment operator
   State& operator=(const State& other) {
     key_ = other.key_;
     ts_ = other.ts_;
@@ -35,12 +35,12 @@ class State {
     return *this;
   }
 
-  //Overload < operator
+  // Overload < operator
   bool operator<(const State& rhs) const {
     return ts_ < rhs.ts_;
   }
 
-  //Accessors
+  // Accessors
   const auto key() const {
     std::lock_guard<std::mutex> lock(stateMutex_);
     return key_;
@@ -58,14 +58,14 @@ class State {
     return imuBias_;
   }
 
-  //Update state Graph Key and Timestamp
+  // Update state Graph Key and Timestamp
   void updateKeyAndTimestamp(const gtsam::Key key, const double ts) {
     std::lock_guard<std::mutex> lock(stateMutex_);
     key_ = key;
     ts_ = ts;
   }
 
-  //Update state Graph Key, Timestamp and NavState(Pose+Velocity)
+  // Update state Graph Key, Timestamp and NavState(Pose+Velocity)
   void updateNavState(const gtsam::Key key, const double ts, const gtsam::NavState& navState) {
     std::lock_guard<std::mutex> lock(stateMutex_);
     key_ = key;
@@ -73,7 +73,7 @@ class State {
     navState_ = navState;
   }
 
-  //Update state Graph Key, Timestamp and IMU Bias estimate
+  // Update state Graph Key, Timestamp and IMU Bias estimate
   void updateImuBias(const gtsam::Key key, const double ts, const gtsam::imuBias::ConstantBias& imuBias) {
     std::lock_guard<std::mutex> lock(stateMutex_);
     key_ = key;
@@ -81,7 +81,7 @@ class State {
     imuBias_ = imuBias;
   }
 
-  //Update state Graph Key, Timestamp, NavState(Pose+Velocity) and IMU Bias estimate
+  // Update state Graph Key, Timestamp, NavState(Pose+Velocity) and IMU Bias estimate
   void updateNavStateAndBias(const gtsam::Key key, const double ts, const gtsam::NavState& navState, const gtsam::imuBias::ConstantBias& imuBias) {
     std::lock_guard<std::mutex> lock(stateMutex_);
     key_ = key;

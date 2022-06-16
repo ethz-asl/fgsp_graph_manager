@@ -1,4 +1,5 @@
 #include "graph_manager/graph_manager_node.h"
+#include <chrono>
 #include <exception>
 #include <functional>
 
@@ -24,8 +25,11 @@ GraphManagerNode::GraphManagerNode()
 
   manager_ = std::make_unique<fgsp::GraphManager>(*config_, *publisher_);
 
-  odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
+  odom_sub_ = create_subscription<nav_msgs::msg::Odometry>(
       config_->odom_topic, 10, std::bind(&fgsp::GraphManager::odometryCallback, manager_.get(), std::placeholders::_1));
+
+  timer_ = create_wall_timer(std::chrono::milliseconds(config_->update_interval_ms),
+                             std::bind(&fgsp::GraphManager::updateGraphResults, manager_.get()));
 
   logger.logInfo("Subscribed input odometry to " + config_->odom_topic);
   logger.logInfo("Graph Manager initialized");
@@ -33,11 +37,8 @@ GraphManagerNode::GraphManagerNode()
 
 int main(int argc, char** argv) {
   rclcpp::init(argc, argv);
-
   auto graph_manager_node = std::make_shared<GraphManagerNode>();
-
   rclcpp::spin(graph_manager_node);
-
   rclcpp::shutdown();
   return 0;
 }

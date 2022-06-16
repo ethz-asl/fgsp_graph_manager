@@ -52,15 +52,14 @@ GraphManager::GraphManager(GraphManagerConfig const& config,
   // Set factor graph params
   params_.optimizationParams = gtsam::ISAM2GaussNewtonParams();
   params_.factorization = gtsam::ISAM2Params::QR;  // CHOLESKY:Fast but non-stable //QR:Slower but more stable in poorly conditioned problems
-  gtsam::FastMap<char, gtsam::Vector> relinTh;     // Set graph relinearization thresholds - must be lower case letters, check:gtsam::symbol_shorthand
-  // params_.relinearizeThreshold = 0.05;
-  // params_.setEnableRelinearization(true);
-  // params_.setRelinearizeSkip(1);
-  // params_.setCacheLinearizedFactors(false);
-  // params_.setEvaluateNonlinearError(false);
-  // params_.findUnusedFactorSlots = false;  // NOTE: Set false for factor removal lookup
-  // params_.setEnablePartialRelinearizationCheck(true);
-  // params_.setEnableDetailedResults(false);
+  params_.relinearizeThreshold = 0.05;
+  params_.enableRelinearization = true;
+  params_.cacheLinearizedFactors = false;
+  params_.relinearizeSkip = 1;
+  params_.evaluateNonlinearError = false;
+  params_.findUnusedFactorSlots = false;  // NOTE: Set false for factor removal lookup
+  params_.enablePartialRelinearizationCheck = true;
+  params_.enableDetailedResults = false;
 
   // Initialize factor graph object
   graph_ = std::make_shared<gtsam::ISAM2>(params_);
@@ -138,7 +137,7 @@ void GraphManager::odometryCallback(nav_msgs::msg::Odometry const& odom) {
 
   if (config_.verbose > 0 && new_key % 10 == 0) {
     auto const& logger = GraphManagerLogger::getInstance();
-    logger.logInfo("\033[35mODOMETRY\033[0m ts: " + std::to_string(odom.header.stamp.sec) + ", key: " + std::to_string(new_key) +
+    logger.logInfo("\033[35mODOMETRY\033[0m ts: " + std::to_string(odom.header.stamp.sec) +
                    ", key: " + std::to_string(new_key) +
                    ", time(ms): " + std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count()));
   }
@@ -344,22 +343,6 @@ void GraphManager::updateGraphResults() {
   }
   auto t_update = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - t_0).count();
 
-  // Publish result at now() timestamp to account for optmization delay
-  // //   ros::Time resultTimestamp = ros::Time::now();
-
-  // Clear constraint marker messages
-  // //   _anchorMarkerMsg.header.stamp = resultTimestamp;
-  // _anchorMarkerMsg.points.clear();
-  // //   _absoluteMarkerMsg.header.stamp = resultTimestamp;
-  // _absoluteMarkerMsg.points.clear();
-  // //   _submapMarkerMsg.points.clear();
-  // //   _submapMarkerMsg.colors.clear();
-  // //   _submapMarkerMsg.header.stamp = resultTimestamp;
-  // //   _submapParentMarkerMsg.points.clear();
-  // //   _submapParentMarkerMsg.colors.clear();
-  // //   _submapParentMarkerMsg.header.stamp = resultTimestamp;
-  // //   _submapTextMarkerArrayMsg.markers.clear();
-
   auto t1 = std::chrono::high_resolution_clock::now();
   nav_msgs::msg::Path path_msg;
 
@@ -371,18 +354,15 @@ void GraphManager::updateGraphResults() {
 
     // Create pose message.
     geometry_msgs::msg::PoseStamped pose_msg;
-    pose_msg.header.frame_id = config_.world_frame;
+    pose_msg.header.frame_id = "map";
     pose_msg.header.stamp = rclcpp::Time(keyTimestampMap[i]);  // Publish each pose at timestamp corresponding to node in the graph (Note: ts=0 in case of map lookup failure)
     createPoseMessage(T_G_B, &pose_msg);
     path_msg.poses.emplace_back(pose_msg);
   }
 
   // Publish Path
-  // if (_pubUpdatedPath.getNumSubscribers() > 0) {
-  //     pathMsg.header.frame_id = _world_frame;
-  //     pathMsg.header.stamp = resultTimestamp;
-  //     _pubUpdatedPath.publish(pathMsg);
-  //   }
+  path_msg.header.frame_id = "map";
+  publisher_.publish(path_msg, "/optimized_path");
 
   // Update last optimzed pose
   T_G_B_opt_ = result.at<gtsam::Pose3>(X(result.size() - 1));

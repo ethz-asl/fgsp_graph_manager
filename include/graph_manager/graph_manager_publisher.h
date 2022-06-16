@@ -8,7 +8,7 @@ namespace fgsp {
 
 class GraphManagerPublisher {
  public:
-  GraphManagerPublisher(rclcpp::Node& node);
+  explicit GraphManagerPublisher(rclcpp::Node& node);
 
   template <typename T>
   void publish(const T& msg, const std::string& topic) {

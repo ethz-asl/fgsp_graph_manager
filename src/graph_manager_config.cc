@@ -52,7 +52,7 @@ GraphManagerConfig* GraphManagerConfig::init(rclcpp::Node& node) {
   config->anchor_noise_std = parser.get_parameter("anchor_noise_std", config->anchor_noise_std);
 
   config->odom_topic = parser.get_parameter("odom_topic", config->odom_topic);
-  config->update_interval_s = parser.get_parameter("update_interval_s", config->update_interval_s);
+  config->update_interval_ms = parser.get_parameter("update_interval_ms", config->update_interval_ms);
 
   config->T_O_B = parser.get_parameter("T_O_B", config->T_O_B);
   config->T_B_C = parser.get_parameter("T_B_C", config->T_B_C);

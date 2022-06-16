@@ -35,7 +35,7 @@ namespace fgsp {
 
 class GraphManager {
  public:
-  GraphManager(GraphManagerConfig const& config, GraphManagerPublisher& publisher);
+  explicit GraphManager(GraphManagerConfig const& config, GraphManagerPublisher& publisher);
   // Setup
   //  bool setup(ros::NodeHandle& node, ros::NodeHandle& privateNode);
 

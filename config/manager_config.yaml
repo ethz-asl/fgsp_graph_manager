@@ -19,7 +19,7 @@ graph_manager:
     submap_noise_std: [1.0e-03, 1.0e-03, 1.0e-03, 1.0e-03, 1.0e-03, 1.0e-03] # Noise of relative Submap factors - ORDER RPY(rad) - XYZ(m)
     anchor_noise_std: [1.0e-05, 1.0e-05, 1.0e-05, 1.0e-05, 1.0e-05, 1.0e-05] # Noise of anchor factors - ORDER RPY(rad) - XYZ(m)
 
-    update_interval_s: 5.0 # Interval(seconds) at which graph is optimized
+    update_interval_ms: 5000 # Interval(ms) at which graph is optimized
     odom_topic: "/euroc_1/rovioli/odom_T_M_I"
 
     T_O_B:
