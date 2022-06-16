@@ -20,6 +20,7 @@ graph_manager:
     anchor_noise_std: [1.0e-05, 1.0e-05, 1.0e-05, 1.0e-05, 1.0e-05, 1.0e-05] # Noise of anchor factors - ORDER RPY(rad) - XYZ(m)
 
     update_interval_s: 5.0 # Interval(seconds) at which graph is optimized
+    odom_topic: "/euroc_1/rovioli/odom_T_M_I"
 
     T_O_B:
       [

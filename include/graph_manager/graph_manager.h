@@ -27,6 +27,7 @@
 // #include "loam/GraphState.hpp"
 // #include "loam/OptStatus.h"
 #include "graph_manager/graph_manager_config.h"
+#include "graph_manager/graph_manager_publisher.h"
 
 using gtsam::symbol_shorthand::X;  // Pose3 (R,t)
 
@@ -34,7 +35,7 @@ namespace fgsp {
 
 class GraphManager {
  public:
-  GraphManager(GraphManagerConfig const& config);
+  GraphManager(GraphManagerConfig const& config, GraphManagerPublisher& publisher);
   // Setup
   //  bool setup(ros::NodeHandle& node, ros::NodeHandle& privateNode);
 
@@ -93,9 +94,9 @@ class GraphManager {
   //   boost::shared_ptr<message_filters::Synchronizer<_syncPolicy>> _syncPtr;                                                  // ROS  Sync Policy Message Filter
 
   //   //Publishers
-  //   ros::Publisher _pubIncrementalPath, _pubIncPoseStamped;  // Current (Incremental) state of graph, path and posestamped
+  // ros::Publisher _pubIncrementalPath, _pubIncPoseStamped;  // Current (Incremental) state of graph, path and posestamped
   //   ros::Publisher _pubUpdatedPath, _pubOptPoseStamped;      // Optimized graph state, path and posestamped
-  //   nav_msgs::Path _pathMsg;                                 // ROS path message for graph
+  nav_msgs::msg::Path path_msg_;  // ROS path message for graph
   //   ros::Publisher _pubMap;                                  // Publish corrected Map
 
   //   //Frame names and transforms
@@ -152,8 +153,7 @@ class GraphManager {
   //   double _updateResultsInterval = 30.0;  //Interval (seconds) for graph update callback
   //   ros::Timer _timerUpdateResults;        //Timer callback for graph update
 
-  //   //Pointcloud
-  gtsam::Pose3 lastCloudSavePose_;  // pose of last pointcloud saved
+  gtsam::Pose3 last_odom_save_pose_;  // pose of last pointcloud saved
 
   //   //Debug
   // int _verbose = 0;                                           //Verbosity level of MaplabIntegrator (0:quiet)
@@ -166,6 +166,8 @@ class GraphManager {
   //   visualization_msgs::Marker _submapTextMarkerMsg;            //Constraint text marker message
   //   visualization_msgs::MarkerArray _submapTextMarkerArrayMsg;  //Constraint text marker message array
   GraphManagerConfig const& config_;
+  GraphManagerPublisher& publisher_;
+  bool is_odom_degenerated_ = false;
 };
 
 }  // namespace fgsp

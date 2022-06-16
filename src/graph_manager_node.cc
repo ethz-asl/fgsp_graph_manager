@@ -1,4 +1,5 @@
 #include "graph_manager/graph_manager_node.h"
+#include <exception>
 #include <functional>
 
 #include <std_msgs/msg/string.hpp>
@@ -15,20 +16,19 @@ GraphManagerNode::GraphManagerNode()
     logger.logError("Invalid configuration. Aborting.");
     return;
   }
+  publisher_ = std::make_unique<fgsp::GraphManagerPublisher>(*this);
+  if (publisher_ == nullptr) {
+    logger.logError("Invalid publisher. Aborting.");
+    return;
+  }
 
-  manager_ = std::make_unique<fgsp::GraphManager>(*config_);
+  manager_ = std::make_unique<fgsp::GraphManager>(*config_, *publisher_);
 
   odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
       config_->odom_topic, 10, std::bind(&fgsp::GraphManager::odometryCallback, manager_.get(), std::placeholders::_1));
 
   logger.logInfo("Subscribed input odometry to " + config_->odom_topic);
-
   logger.logInfo("Graph Manager initialized");
-
-  publisher_ = std::make_unique<fgsp::GraphManagerPublisher>(*this);
-  std_msgs::msg::String msg;
-  msg.data = "Graph Manager initialized";
-  publisher_->publish(msg, "/graph_manager_status");
 }
 
 int main(int argc, char** argv) {
