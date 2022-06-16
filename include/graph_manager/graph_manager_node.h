@@ -20,5 +20,7 @@ class GraphManagerNode : public rclcpp::Node {
   std::unique_ptr<fgsp::GraphManagerPublisher> publisher_;
 
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
+  rclcpp::Subscription<nav_msgs::msg::Path>::SharedPtr anchor_sub_;
+  rclcpp::Subscription<nav_msgs::msg::Path>::SharedPtr relative_sub_;
   rclcpp::TimerBase::SharedPtr timer_;
 };

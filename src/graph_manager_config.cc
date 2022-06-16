@@ -51,7 +51,10 @@ GraphManagerConfig* GraphManagerConfig::init(rclcpp::Node& node) {
   config->submap_noise_std = parser.get_parameter("submap_noise_std", config->submap_noise_std);
   config->anchor_noise_std = parser.get_parameter("anchor_noise_std", config->anchor_noise_std);
 
+  // Topics
   config->odom_topic = parser.get_parameter("odom_topic", config->odom_topic);
+  config->anchor_topic = parser.get_parameter("anchor_topic", config->anchor_topic);
+  config->relative_topic = parser.get_parameter("relative_topic", config->relative_topic);
   config->update_interval_ms = parser.get_parameter("update_interval_ms", config->update_interval_ms);
 
   config->T_O_B = parser.get_parameter("T_O_B", config->T_O_B);

@@ -28,6 +28,12 @@ GraphManagerNode::GraphManagerNode()
   odom_sub_ = create_subscription<nav_msgs::msg::Odometry>(
       config_->odom_topic, 10, std::bind(&fgsp::GraphManager::odometryCallback, manager_.get(), std::placeholders::_1));
 
+  anchor_sub_ = create_subscription<nav_msgs::msg::Path>(
+      config_->anchor_topic, 10, std::bind(&fgsp::GraphManager::processAnchorConstraints, manager_.get(), std::placeholders::_1));
+
+  relative_sub_ = create_subscription<nav_msgs::msg::Path>(
+      config_->relative_topic, 10, std::bind(&fgsp::GraphManager::processRelativeConstraints, manager_.get(), std::placeholders::_1));
+
   timer_ = create_wall_timer(std::chrono::milliseconds(config_->update_interval_ms),
                              std::bind(&fgsp::GraphManager::updateGraphResults, manager_.get()));
 

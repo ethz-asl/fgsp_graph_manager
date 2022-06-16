@@ -24,6 +24,8 @@ struct GraphManagerConfig {
   std::vector<double> anchor_noise_std = {0.001, 0.001, 0.001, 0.001, 0.001, 0.001};  // rad,rad,rad,m,m,m;
 
   std::string odom_topic = "/odometry";
+  std::string anchor_topic = "/graph_client/anchor_nodes";
+  std::string relative_topic = "/graph_client/relative_nodes";
   int update_interval_ms = 10000;  // Update interval at which the graph is optimized (ms)
 
   // Extrinsic calibrations

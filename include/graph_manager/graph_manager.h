@@ -5,10 +5,6 @@
 #include <unordered_map>
 #include <vector>
 
-// #include <message_filters/subscriber.h>
-// #include <message_filters/sync_policies/approximate_time.h>
-// #include <message_filters/sync_policies/exact_time.h>
-// #include <message_filters/synchronizer.h>
 #include <geometry_msgs/msg/pose_with_covariance_stamped.h>
 #include <nav_msgs/msg/odometry.hpp>
 #include <nav_msgs/msg/path.hpp>
@@ -24,8 +20,6 @@
 #include <gtsam/slam/BetweenFactor.h>
 #include <gtsam/slam/PriorFactor.h>
 
-// #include "loam/GraphState.hpp"
-// #include "loam/OptStatus.h"
 #include "graph_manager/graph_manager_config.h"
 #include "graph_manager/graph_manager_publisher.h"
 
@@ -65,49 +59,11 @@ class GraphManager {
   void incFactorCount() { ++factor_count_; }
   auto getFactorCount() -> std::size_t { return factor_count_; }
 
-  //   //Intialize Sensor extrinsic transforms
-  //   void initSensorTransforms();
-
-  //   //Members
-
-  //   //Subscribers
-  //   ros::Subscriber _subOdomEUROC;     // Odometry subscriber for odometry constraints
-  //   ros::Subscriber _subAbsolutePose;  // Absolute pose constraints from Apriltags
-  //   ros::Subscriber _subMaplabAnchor;  // Maplab published Anchor constraints
-  //   ros::Subscriber _subMaplabSubmap;  // Maplab published Submap-to-Submap contraints
-
-  //   // //Synced subscriber
-  //   message_filters::Subscriber<nav_msgs::Odometry> _subOdom;                                                                //Odometry subscriber for odometry constraints
-  //   message_filters::Subscriber<OptStatus> _subOdomStatus;                                                                   //Odometry status subscriber for marking variables at which odometry is degenerate
-  //   message_filters::Subscriber<sensor_msgs::PointCloud2> _subCloud;                                                         //Pointcloud subscriber for saving clouds for building a map
-  //   typedef message_filters::sync_policies::ExactTime<nav_msgs::Odometry, OptStatus, sensor_msgs::PointCloud2> _syncPolicy;  // ROS Sync Policy Object
-  //   boost::shared_ptr<message_filters::Synchronizer<_syncPolicy>> _syncPtr;                                                  // ROS  Sync Policy Message Filter
-
-  //   //Publishers
-  // ros::Publisher _pubIncrementalPath, _pubIncPoseStamped;  // Current (Incremental) state of graph, path and posestamped
-  //   ros::Publisher _pubUpdatedPath, _pubOptPoseStamped;      // Optimized graph state, path and posestamped
   nav_msgs::msg::Path path_msg_;  // ROS path message for graph
-  //   ros::Publisher _pubMap;                                  // Publish corrected Map
 
-  //   //Frame names and transforms
-  //   bool _publishWorldtoMapTf = false;
-  //   std::string _world_frame = "world";
-  //   std::string _map_frame = "map";
-  //   std::string _base_frame = "imu";
-  //   tf::TransformBroadcaster _tb;              // transform broadcaster
-  //   geometry_msgs::TransformStamped _optPose;  // Optimized Pose
-  //   geometry_msgs::TransformStamped _incPose;  // incremental Pose
-
-  //   //Transforms
-  //   tf::TransformListener _tl;       // Transform Listener for calculating external estimate
-  //   std::string _lidar_frame = "";   //LiDAR frame name - used for LiDAR-to-Sensor transform lookup
-  // std::string _camera_frame = "";  //Frame of camera used for apriltag detection (absolute poses)
-  // std::string _imu_frame = "";     //Frame of IMU used by maplab
-  gtsam::Pose3 T_O_B_;      // IMU(B) to LiDAR(L)
-  gtsam::Pose3 T_B_C_;      // camera(C) to  IMU(B)
-  gtsam::Pose3 T_G_M_;      // Robot(Local) Map(M) to DARPA(G) - Local Robot Map start at origin MUST BE SET TO ZERO ON INIT in (B) frame - this needs to be updated to make the local graph expressed w.r.t (G)
-  gtsam::Pose3 T_G_B_opt_;  // IMU to DARPA(G) - optimized
-  gtsam::Pose3 T_G_B_inc_;  // IMU to DARPA(G) - incremental
+  gtsam::Pose3 T_O_B_;      // IMU(B) to Odometry(O)
+  gtsam::Pose3 T_B_C_;      // Camera(C) to  IMU(B)
+  gtsam::Pose3 T_G_B_inc_;  // IMU to Global(G) - incremental
 
   // Factor graph
   std::size_t factor_count_ = 0;             // Counter for Total factors (existing + removed)
@@ -116,7 +72,6 @@ class GraphManager {
   gtsam::NonlinearFactorGraph new_factors_;  // New factors to be added to the graph
   std::shared_ptr<gtsam::ISAM2> graph_;      // iSAM2 GRAPH object
   gtsam::Key state_key_ = 0;                 // Current state key
-                                             // std::vector<StatePtr> _states;  // Vecotr of states //TODO deprecate
 
   // Factor noise vectors - ORDER RPY(rad) - XYZ(meters)
   gtsam::Vector6 odom_noise_;      // Odometry BetweenFactor Noise
@@ -128,9 +83,6 @@ class GraphManager {
   bool first_odom_msg_ = true;
   gtsam::Pose3 last_IMU_pose_;
 
-  // Absolute pose factor
-  bool first_absolute_pose_ = true;
-
   // Lookup map objects for key-to-factorIndex associations
   std::unordered_map<double, gtsam::Key> timestamp_key_map_;                          // Timestamp-Key map for lookup of keys corresponding to odometry timestamps
   std::unordered_map<gtsam::Key, double> key_timestamp_map_;                          // Key-Timestamp map used for publishing graph node timestamps for path message publishing
@@ -139,22 +91,6 @@ class GraphManager {
   std::unordered_map<gtsam::Key, std::set<size_t>> key_submap_factor_idx_map_;        // Key-SubmapBetweenFactorIndex map for lookup of indices of betweenfactor added at key for Submap constraints
   std::unordered_map<gtsam::Key, std::set<gtsam::Key>> submap_parent_child_key_map_;  // Parent-Child keys for visualization of relative submap constrinats
 
-  //   //Timer-based map/result update and publish
-  //   double _updateResultsInterval = 30.0;  //Interval (seconds) for graph update callback
-  //   ros::Timer _timerUpdateResults;        //Timer callback for graph update
-
-  gtsam::Pose3 last_odom_save_pose_;  // pose of last pointcloud saved
-
-  //   //Debug
-  // int config_.verbose = 0;                                           //Verbosity level of MaplabIntegrator (0:quiet)
-  //   ros::Publisher _pubConstraintMarkers;                       //Constraint marker publisher
-  //   visualization_msgs::Marker _absoluteMarkerMsg;              //Absolute contraint marker messages
-  //   visualization_msgs::Marker _anchorMarkerMsg;                //Anchor(Unary) contraint marker messages
-  //   visualization_msgs::Marker _submapMarkerMsg;                //Submap(Relative) contraint marker messages
-  //   visualization_msgs::Marker _submapParentMarkerMsg;          //Submap-Parent node contraint marker messages
-  //   ros::Publisher _pubConstraintTextMarkers;                   //Constraint text marker publisher
-  //   visualization_msgs::Marker _submapTextMarkerMsg;            //Constraint text marker message
-  //   visualization_msgs::MarkerArray _submapTextMarkerArrayMsg;  //Constraint text marker message array
   GraphManagerConfig const& config_;
   GraphManagerPublisher& publisher_;
   bool is_odom_degenerated_ = false;

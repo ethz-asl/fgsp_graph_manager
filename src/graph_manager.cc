@@ -112,13 +112,6 @@ void GraphManager::odometryCallback(nav_msgs::msg::Odometry const& odom) {
   // Save last IMU pose for calculting delta
   last_IMU_pose_ = T_M_B;
 
-  // Check motion difference to know if incoming cloud should be saved
-  gtsam::Pose3 cloud_delta = last_odom_save_pose_.between(T_M_O);
-  if (cloud_delta.translation().norm() > config_.pos_delta ||
-      cloud_delta.rotation().rpy().norm() > config_.rot_delta) {
-    last_odom_save_pose_ = T_M_O;
-  }
-
   // Publish Graph path
   // Pose Message
   geometry_msgs::msg::PoseStamped pose_msg;
@@ -342,7 +335,6 @@ void GraphManager::updateGraphResults() {
   nav_msgs::msg::Path path_msg;
 
   // Loop through result values - Result in absolute frame
-  T_G_M_ = result.at<gtsam::Pose3>(X(0));
   const std::size_t n_result = result.size();
   for (std::size_t i = 0; i < n_result; ++i) {
     gtsam::Pose3 T_G_B = result.at<gtsam::Pose3>(X(i));
@@ -359,9 +351,6 @@ void GraphManager::updateGraphResults() {
   path_msg.header.frame_id = "map";
   path_msg.header.stamp = publisher_.getTimeNow();
   publisher_.publish(path_msg, "/optimized_path");
-
-  // Update last optimzed pose
-  T_G_B_opt_ = result.at<gtsam::Pose3>(X(result.size() - 1));
 
   auto t2 = std::chrono::high_resolution_clock::now();
   if (config_.verbose > 1) {
