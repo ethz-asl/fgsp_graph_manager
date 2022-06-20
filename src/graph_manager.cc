@@ -68,7 +68,8 @@ GraphManager::GraphManager(GraphManagerConfig const& config,
 
 void GraphManager::odometryCallback(nav_msgs::msg::Odometry const& odom) {
   // Current timestamp and odom pose
-  const double ts = odom.header.stamp.sec;
+  const double ts = odom.header.stamp.sec * 1e9 + odom.header.stamp.nanosec;
+  std::cout << "GraphManager previosly: " << odom.header.stamp.sec << std::endl;
   const auto& p = odom.pose.pose;
   const gtsam::Pose3 T_M_O(gtsam::Rot3(p.orientation.w, p.orientation.x, p.orientation.y, p.orientation.z),
                            gtsam::Point3(p.position.x, p.position.y, p.position.z));
@@ -151,7 +152,7 @@ void GraphManager::processAnchorConstraints(nav_msgs::msg::Path const& path) {
     gtsam::FactorIndices remove_factor_idx;
     for (const geometry_msgs::msg::PoseStamped& pose_msg : path.poses) {
       // Update timestamp
-      const double ts = pose_msg.header.stamp.sec;
+      const double ts = pose_msg.header.stamp.sec * 1e9 + pose_msg.header.stamp.nanosec;
 
       // Find corresponding key in graph
       gtsam::Key key;
@@ -216,7 +217,7 @@ void GraphManager::processRelativeConstraints(nav_msgs::msg::Path const& path) {
   }
 
   // Find corresponding parent key in graph
-  const auto& parent_ts = path.header.stamp.sec;
+  const auto parent_ts = path.header.stamp.sec * 1e9 + path.header.stamp.nanosec;
   {
     std::lock_guard<std::mutex> lock(graph_mutex_);
     auto parent_itr = timestamp_key_map_.find(parent_ts);
@@ -226,7 +227,7 @@ void GraphManager::processRelativeConstraints(nav_msgs::msg::Path const& path) {
       auto t1 = std::chrono::high_resolution_clock::now();
       const std::size_t n_poses = path.poses.size();
       for (size_t i = 0; i < n_poses; ++i) {
-        const auto& child_ts = path.poses[i].header.stamp.sec;
+        const auto child_ts = path.poses[i].header.stamp.sec * 1e9 + path.poses[i].header.stamp.nanosec;
 
         // Check if child is associated to a key
         auto child_itr = timestamp_key_map_.find(child_ts);
@@ -342,6 +343,8 @@ void GraphManager::updateGraphResults() {
     // Create pose message.
     geometry_msgs::msg::PoseStamped pose_msg;
     pose_msg.header.frame_id = "map";
+    std::cout.precision(16);
+    std::cout << "KEYTIMESTAMP MAP: " << keyTimestampMap[i] << std::endl;
     pose_msg.header.stamp = rclcpp::Time(keyTimestampMap[i]);  // Publish each pose at timestamp corresponding to node in the graph (Note: ts=0 in case of map lookup failure)
     createPoseMessage(T_G_B, &pose_msg);
     path_msg.poses.emplace_back(pose_msg);
@@ -349,6 +352,9 @@ void GraphManager::updateGraphResults() {
 
   // Publish Path
   path_msg.header.frame_id = "map";
+  std::cout << "[TESTSTESTES] time now is " << publisher_.getTimeNow().seconds()
+            << " secs and " << publisher_.getTimeNow().nanoseconds()
+            << " nanosecs" << std::endl;
   path_msg.header.stamp = publisher_.getTimeNow();
   publisher_.publish(path_msg, "/optimized_path");
 
