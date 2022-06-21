@@ -15,7 +15,7 @@ find_package(rclcpp REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
-find_package(message_filters REQUIRED)
+find_package(visualization_msgs REQUIRED)
 find_package(GTSAM REQUIRED)
 find_package(Boost REQUIRED COMPONENTS timer)
 find_package(Eigen3 REQUIRED)
@@ -32,11 +32,11 @@ add_library(graph_manager STATIC
   src/graph_manager_logger.cc
   src/graph_manager_publisher.cc
   src/graph_manager_visualizer.cc)
-ament_target_dependencies(graph_manager rclcpp geometry_msgs nav_msgs sensor_msgs message_filters)
+ament_target_dependencies(graph_manager rclcpp geometry_msgs nav_msgs sensor_msgs visualization_msgs)
 
 add_executable(graph_manager_node src/graph_manager_node.cc)
 target_link_libraries(graph_manager_node graph_manager ${Boost_LIBRARIES} gtsam)
-ament_target_dependencies(graph_manager_node rclcpp geometry_msgs nav_msgs sensor_msgs message_filters)
+ament_target_dependencies(graph_manager_node rclcpp geometry_msgs nav_msgs sensor_msgs visualization_msgs)
 
 install(TARGETS
   TARGETS graph_manager_node

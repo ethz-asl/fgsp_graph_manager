@@ -323,41 +323,15 @@ void GraphManager::updateGraphResults() {
   // Update results
   gtsam::Values result;
   std::unordered_map<gtsam::Key, double> keyTimestampMap;
-  auto t_0 = std::chrono::high_resolution_clock::now();
   {
     std::lock_guard<std::mutex> lock(graph_mutex_);
     result = graph_->calculateBestEstimate();
     keyTimestampMap = key_timestamp_map_;  // copy cost 36000 elements(10Hz * 1Hr) ~10ms
   }
-  auto t_update = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - t_0).count();
 
-  auto t1 = std::chrono::high_resolution_clock::now();
-  nav_msgs::msg::Path path_msg;
-
-  // Loop through result values - Result in absolute frame
-  const std::size_t n_result = result.size();
-  for (std::size_t i = 0; i < n_result; ++i) {
-    gtsam::Pose3 T_G_B = result.at<gtsam::Pose3>(X(i));
-
-    // Create pose message.
-    geometry_msgs::msg::PoseStamped pose_msg;
-    pose_msg.header.frame_id = "map";
-    pose_msg.header.stamp = rclcpp::Time(keyTimestampMap[i]);  // Publish each pose at timestamp corresponding to node in the graph (Note: ts=0 in case of map lookup failure)
-    createPoseMessage(T_G_B, &pose_msg);
-    path_msg.poses.emplace_back(pose_msg);
-  }
-
-  // Publish Path
-  path_msg.header.frame_id = "map";
-  path_msg.header.stamp = publisher_.getTimeNow();
-  publisher_.publish(path_msg, "/optimized_path");
-
-  auto t2 = std::chrono::high_resolution_clock::now();
-  if (config_.verbose > 1) {
-    auto logger = GraphManagerLogger::getInstance();
-    logger.logInfo("\033[36mGRAPH UPDATE\033[0m - time(us):" + std::to_string(t_update) + ", Map Build(ms): " + std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count()));
-    logger.logInfo("\033[36mGRAPH UPDATE\033[0m - number of factors: " + std::to_string(factor_count_));
-  }
+  // Visualize results
+  visualizer_.clear();
+  visualizer_.update(result, keyTimestampMap);
 }
 
 bool GraphManager::createPoseMessage(const gtsam::Pose3& pose, geometry_msgs::msg::PoseStamped* pose_msg) const {
