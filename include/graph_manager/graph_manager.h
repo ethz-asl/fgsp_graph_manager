@@ -22,6 +22,7 @@
 
 #include "graph_manager/graph_manager_config.h"
 #include "graph_manager/graph_manager_publisher.h"
+#include "graph_manager/graph_manager_visualizer.h"
 
 using gtsam::symbol_shorthand::X;  // Pose3 (R,t)
 
@@ -29,7 +30,7 @@ namespace fgsp {
 
 class GraphManager {
  public:
-  explicit GraphManager(GraphManagerConfig const& config, GraphManagerPublisher& publisher);
+  explicit GraphManager(GraphManagerConfig const& config, GraphManagerPublisher& publisher, GraphManagerVisualizer& visualizer);
 
   void odometryCallback(nav_msgs::msg::Odometry const& odom);
   void processAnchorConstraints(nav_msgs::msg::Path const& path);
@@ -93,6 +94,7 @@ class GraphManager {
 
   GraphManagerConfig const& config_;
   GraphManagerPublisher& publisher_;
+  GraphManagerVisualizer& visualizer_;
   bool is_odom_degenerated_ = false;
 };
 

@@ -23,7 +23,8 @@ GraphManagerNode::GraphManagerNode()
     return;
   }
 
-  manager_ = std::make_unique<fgsp::GraphManager>(*config_, *publisher_);
+  visualizer_ = std::make_unique<fgsp::GraphManagerVisualizer>(*config_, *publisher_);
+  manager_ = std::make_unique<fgsp::GraphManager>(*config_, *publisher_, *visualizer_);
 
   odom_sub_ = create_subscription<nav_msgs::msg::Odometry>(
       config_->odom_topic, 10, std::bind(&fgsp::GraphManager::odometryCallback, manager_.get(), std::placeholders::_1));

@@ -8,8 +8,8 @@
 namespace fgsp {
 
 GraphManager::GraphManager(GraphManagerConfig const& config,
-                           GraphManagerPublisher& publisher)
-    : config_(config), publisher_(publisher) {
+                           GraphManagerPublisher& publisher, GraphManagerVisualizer& visualizer)
+    : config_(config), publisher_(publisher), visualizer_(visualizer) {
   auto& logger = GraphManagerLogger::getInstance();
   logger.logInfo("GraphManager - Verbosity level set to: " + std::to_string(config.verbose));
   logger.logInfo("GraphManager - World/Global frame set to: " + config.world_frame);
@@ -69,7 +69,6 @@ GraphManager::GraphManager(GraphManagerConfig const& config,
 void GraphManager::odometryCallback(nav_msgs::msg::Odometry const& odom) {
   // Current timestamp and odom pose
   const double ts = odom.header.stamp.sec * 1e9 + odom.header.stamp.nanosec;
-  std::cout << "GraphManager previosly: " << odom.header.stamp.sec << std::endl;
   const auto& p = odom.pose.pose;
   const gtsam::Pose3 T_M_O(gtsam::Rot3(p.orientation.w, p.orientation.x, p.orientation.y, p.orientation.z),
                            gtsam::Point3(p.position.x, p.position.y, p.position.z));
@@ -343,8 +342,6 @@ void GraphManager::updateGraphResults() {
     // Create pose message.
     geometry_msgs::msg::PoseStamped pose_msg;
     pose_msg.header.frame_id = "map";
-    std::cout.precision(16);
-    std::cout << "KEYTIMESTAMP MAP: " << keyTimestampMap[i] << std::endl;
     pose_msg.header.stamp = rclcpp::Time(keyTimestampMap[i]);  // Publish each pose at timestamp corresponding to node in the graph (Note: ts=0 in case of map lookup failure)
     createPoseMessage(T_G_B, &pose_msg);
     path_msg.poses.emplace_back(pose_msg);
@@ -352,9 +349,6 @@ void GraphManager::updateGraphResults() {
 
   // Publish Path
   path_msg.header.frame_id = "map";
-  std::cout << "[TESTSTESTES] time now is " << publisher_.getTimeNow().seconds()
-            << " secs and " << publisher_.getTimeNow().nanoseconds()
-            << " nanosecs" << std::endl;
   path_msg.header.stamp = publisher_.getTimeNow();
   publisher_.publish(path_msg, "/optimized_path");
 
