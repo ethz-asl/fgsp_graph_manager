@@ -8,14 +8,7 @@ namespace fgsp {
 
 struct GraphManagerConfig {
   int verbose = 0u;  // Verbosity level of MaplabIntegrator (0:quiet)
-  std::string world_frame = "world";
   std::string map_frame = "map";
-  std::string base_frame = "imu";
-  std::string lidar_frame =
-      "";  // LiDAR frame name - used for LiDAR-to-Sensor transform lookup
-  std::string camera_frame =
-      "";  // Frame of camera used for apriltag detection (absolute poses)
-  std::string imu_frame = "";  // Frame of IMU used by maplab
 
   double pos_delta = 4.0;  // Minimum delta position difference Norm to save new
                            // pointcoud (meters)

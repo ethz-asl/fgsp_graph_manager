@@ -15,11 +15,7 @@ GraphManager::GraphManager(
   logger.logInfo(
       "GraphManager - Verbosity level set to: " +
       std::to_string(config.verbose));
-  logger.logInfo(
-      "GraphManager - World/Global frame set to: " + config.world_frame);
   logger.logInfo("GraphManager - Robot Map frame set to: " + config.map_frame);
-  logger.logInfo(
-      "GraphManager - Robot Base frame set to: " + config.base_frame);
 
   logger.logInfo(
       "GraphManager - Minimum Position(m) delta Norm: " +
@@ -27,10 +23,6 @@ GraphManager::GraphManager(
   logger.logInfo(
       "GraphManager - Minimum Rotation(rad) delta Norm: " +
       std::to_string(config.rot_delta));
-
-  logger.logInfo("GraphManager - LiDAR Frame: " + config.lidar_frame);
-  logger.logInfo("GraphManager - Camera Frame: " + config.camera_frame);
-  logger.logInfo("GraphManager - IMU Frame: " + config.imu_frame);
 
   odom_noise_ = Eigen::Map<const Eigen::Matrix<double, 6, 1>>(
       config.odom_noise_std.data());

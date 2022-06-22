@@ -31,21 +31,11 @@ GraphManagerConfig* GraphManagerConfig::init(rclcpp::Node& node) {
 
   // Frames
   config->verbose = parser.get_parameter("verbose", config->verbose);
-  config->world_frame =
-      parser.get_parameter("world_frame", config->world_frame);
   config->map_frame = parser.get_parameter("map_frame", config->map_frame);
-  config->base_frame = parser.get_parameter("base_frame", config->base_frame);
 
   // Operation
   config->pos_delta = parser.get_parameter("pos_delta", config->pos_delta);
   config->rot_delta = parser.get_parameter("rot_delta", config->rot_delta);
-
-  // Calibration
-  config->lidar_frame =
-      parser.get_parameter("lidar_frame", config->lidar_frame);
-  config->camera_frame =
-      parser.get_parameter("camera_frame", config->camera_frame);
-  config->imu_frame = parser.get_parameter("imu_frame", config->imu_frame);
 
   // Noise parameters
   config->odom_noise_std =
