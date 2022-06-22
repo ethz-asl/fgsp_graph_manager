@@ -3,7 +3,14 @@
 #include <chrono>
 #include <sstream>
 
+#include <geometry_msgs/msg/pose_stamped.h>
+#include <gtsam/inference/Symbol.h>
+#include <gtsam/slam/BetweenFactor.h>
+#include <gtsam/slam/PriorFactor.h>
+
 #include "graph_manager/graph_manager_logger.h"
+
+using gtsam::symbol_shorthand::X;  // Pose3 (R,t)
 
 namespace fgsp {
 
@@ -85,9 +92,9 @@ void GraphManager::odometryCallback(nav_msgs::msg::Odometry const& odom) {
   // Compute delta in IMU frame
   if (first_odom_msg_)  // Store first pose to compute zero delta incase input
                         // doesn't start from zero
-    last_IMU_pose_ = T_M_B;
+    last_Base_pose_ = T_M_B;
 
-  gtsam::Pose3 T_B1_B2 = last_IMU_pose_.between(T_M_B);
+  gtsam::Pose3 T_B1_B2 = last_Base_pose_.between(T_M_B);
 
   // Add delta pose factor to graph
   gtsam::Key new_key;
@@ -118,7 +125,7 @@ void GraphManager::odometryCallback(nav_msgs::msg::Odometry const& odom) {
   auto t2 = std::chrono::high_resolution_clock::now();
 
   // Save last IMU pose for calculting delta
-  last_IMU_pose_ = T_M_B;
+  last_Base_pose_ = T_M_B;
 
   if (config_.verbose > 0 && new_key % 10 == 0) {
     auto const& logger = GraphManagerLogger::getInstance();
@@ -399,22 +406,6 @@ void GraphManager::updateGraphResults() {
   visualizer_.update(
       result, keyTimestampMap, relative_parent_child_key_map_,
       key_anchor_pose_map_);
-}
-
-bool GraphManager::createPoseMessage(
-    const gtsam::Pose3& pose, geometry_msgs::msg::PoseStamped* pose_msg) const {
-  if (pose_msg == nullptr) {
-    return false;
-  }
-  pose_msg->pose.position.x = pose.translation().x();
-  pose_msg->pose.position.y = pose.translation().y();
-  pose_msg->pose.position.z = pose.translation().z();
-  pose_msg->pose.orientation.x = pose.rotation().toQuaternion().x();
-  pose_msg->pose.orientation.y = pose.rotation().toQuaternion().y();
-  pose_msg->pose.orientation.z = pose.rotation().toQuaternion().z();
-  pose_msg->pose.orientation.w = pose.rotation().toQuaternion().w();
-
-  return true;
 }
 
 void GraphManager::updateKeyRelativeFactorIdxMap(

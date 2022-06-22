@@ -5,27 +5,17 @@
 #include <unordered_map>
 #include <vector>
 
-#include <geometry_msgs/msg/pose_with_covariance_stamped.h>
 #include <nav_msgs/msg/odometry.hpp>
 #include <nav_msgs/msg/path.hpp>
-#include <sensor_msgs/msg/point_cloud2.hpp>
 
-// #include "visualization_msgs/Marker.h"
-// #include "visualization_msgs/MarkerArray.h"
-
-#define SLOW_BUT_CORRECT_BETWEENFACTOR  // increases accuracy in handling
+#define SLOW_BUT_CORRECT_BETWEENFACTOR  // Increases accuracy in handling
                                         // rotations
 #include <gtsam/geometry/Pose3.h>
-#include <gtsam/inference/Symbol.h>
 #include <gtsam/nonlinear/ISAM2.h>
-#include <gtsam/slam/BetweenFactor.h>
-#include <gtsam/slam/PriorFactor.h>
 
 #include "graph_manager/graph_manager_config.h"
 #include "graph_manager/graph_manager_publisher.h"
 #include "graph_manager/graph_manager_visualizer.h"
-
-using gtsam::symbol_shorthand::X;  // Pose3 (R,t)
 
 namespace fgsp {
 
@@ -39,9 +29,9 @@ class GraphManager {
   void processAnchorConstraints(nav_msgs::msg::Path const& path);
   void processRelativeConstraints(nav_msgs::msg::Path const& path);
 
-  // Get State key
+  // Get state key
   auto stateKey() const -> gtsam::Key { return state_key_; }
-  // State Key increment
+  // State key increment
   auto newStateKey() -> gtsam::Key { return ++state_key_; }
   // Add prior
   void addPriorFactor(const gtsam::Key key, const gtsam::Pose3& pose);
@@ -51,11 +41,6 @@ class GraphManager {
       const gtsam::Pose3& pose_delta, const gtsam::Pose3& pose_estimate);
   // Update ISAM graph
   void updateGraphResults();
-
-  // Utility methods
-  bool createPoseMessage(
-      const gtsam::Pose3& pose,
-      geometry_msgs::msg::PoseStamped* pose_msg) const;
 
   // Lookup maps for key-factor association
   void updateKeyAnchorFactorIdxMap(const gtsam::Key key) {
@@ -92,7 +77,7 @@ class GraphManager {
 
   // Odometry factor
   bool first_odom_msg_ = true;
-  gtsam::Pose3 last_IMU_pose_;
+  gtsam::Pose3 last_Base_pose_;
 
   // Lookup map objects for key-to-factorIndex associations
   std::unordered_map<double, gtsam::Key>
