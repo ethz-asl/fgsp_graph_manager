@@ -112,22 +112,6 @@ void GraphManager::odometryCallback(nav_msgs::msg::Odometry const& odom) {
   // Save last IMU pose for calculting delta
   last_IMU_pose_ = T_M_B;
 
-  // Publish Graph path
-  // Pose Message
-  geometry_msgs::msg::PoseStamped pose_msg;
-  // pose_msg.header.frame_id = (is_odom_degenerated_ ? "degenerate" : "");
-  pose_msg.header.frame_id = "map";
-  pose_msg.header.stamp = odom.header.stamp;
-  createPoseMessage(T_G_B_inc_, &pose_msg);
-
-  // Node Message
-  path_msg_.header.frame_id = "map";
-  path_msg_.header.stamp = pose_msg.header.stamp;
-  path_msg_.poses.emplace_back(std::move(pose_msg));
-
-  // Publish Path
-  publisher_.publish(path_msg_, "/incremental_path");
-
   if (config_.verbose > 0 && new_key % 10 == 0) {
     auto const& logger = GraphManagerLogger::getInstance();
     logger.logInfo("\033[35mODOMETRY\033[0m ts: " + std::to_string(odom.header.stamp.sec) +

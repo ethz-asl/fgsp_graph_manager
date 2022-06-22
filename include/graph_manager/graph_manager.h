@@ -60,8 +60,6 @@ class GraphManager {
   void incFactorCount() { ++factor_count_; }
   auto getFactorCount() -> std::size_t { return factor_count_; }
 
-  nav_msgs::msg::Path path_msg_;  // ROS path message for graph
-
   gtsam::Pose3 T_O_B_;      // IMU(B) to Odometry(O)
   gtsam::Pose3 T_B_C_;      // Camera(C) to  IMU(B)
   gtsam::Pose3 T_G_B_inc_;  // IMU to Global(G) - incremental
