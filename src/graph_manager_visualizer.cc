@@ -9,31 +9,60 @@ using gtsam::symbol_shorthand::X;  // Pose3 (R,t)
 GraphManagerVisualizer::GraphManagerVisualizer(
     GraphManagerConfig const& config, GraphManagerPublisher& publisher)
     : config_(config), publisher_(publisher) {
-  optimized_path_msg_.header.frame_id = "map";
+  anchor_marker_msg_.header.frame_id = config_.map_frame;
+  anchor_marker_msg_.ns = "anchor_constraints";
+  anchor_marker_msg_.type = visualization_msgs::msg::Marker::CUBE_LIST;
+  anchor_marker_msg_.action = visualization_msgs::msg::Marker::ADD;
+  anchor_marker_msg_.scale.x = anchor_marker_msg_.scale.y =
+      anchor_marker_msg_.scale.z = 0.25f;
+  anchor_marker_msg_.color.r = 0.0f;
+  anchor_marker_msg_.color.g = 1.0f;
+  anchor_marker_msg_.color.b = 1.0f;
+  anchor_marker_msg_.color.a = 1.0f;
+  anchor_marker_msg_.pose.orientation.w = 1.0;
+
+  relative_marker_msg_ = anchor_marker_msg_;
+  relative_marker_msg_.ns = "submap_relative_constraints";
+  relative_marker_msg_.type = visualization_msgs::msg::Marker::LINE_LIST;
+  relative_marker_msg_.scale.x = 0.05f;
+
+  relative_parent_marker_msg_ = anchor_marker_msg_;
+  relative_parent_marker_msg_.ns = "submap_parent_nodes";
+  relative_parent_marker_msg_.type =
+      visualization_msgs::msg::Marker::SPHERE_LIST;
+
+  relative_text_marker_msg_ = anchor_marker_msg_;
+  relative_text_marker_msg_.ns = "submap_num_children";
+  relative_text_marker_msg_.type =
+      visualization_msgs::msg::Marker::TEXT_VIEW_FACING;
+  relative_text_marker_msg_.color.a = relative_text_marker_msg_.color.r =
+      relative_text_marker_msg_.color.g = relative_text_marker_msg_.color.b =
+          1.0f;
+
+  // Init frames
+  optimized_path_msg_.header.frame_id = config_.map_frame;
+  relative_marker_msg_.header.frame_id = config_.map_frame;
+  relative_parent_marker_msg_.header.frame_id = config_.map_frame;
+  relative_text_marker_msg_.header.frame_id = config_.map_frame;
 }
 
 void GraphManagerVisualizer::clear() {
   relative_marker_msg_.points.clear();
   relative_marker_msg_.colors.clear();
   relative_marker_msg_.header.stamp = publisher_.getTimeNow();
-  relative_marker_msg_.header.frame_id = config_.map_frame;
   relative_parent_marker_msg_.points.clear();
   relative_parent_marker_msg_.colors.clear();
   relative_parent_marker_msg_.header.stamp = publisher_.getTimeNow();
-  relative_parent_marker_msg_.header.frame_id = config_.map_frame;
 
   relative_text_marker_msg_.text.clear();
   relative_text_marker_msg_.header.stamp = publisher_.getTimeNow();
-  relative_text_marker_msg_.header.frame_id = config_.map_frame;
   relative_text_marker_array_msg_.markers.clear();
 
   anchor_marker_msg_.points.clear();
   anchor_marker_msg_.header.stamp = publisher_.getTimeNow();
-  anchor_marker_msg_.header.frame_id = config_.map_frame;
 
   optimized_path_msg_.poses.clear();
   optimized_path_msg_.header.stamp = publisher_.getTimeNow();
-  optimized_path_msg_.header.frame_id = config_.map_frame;
 }
 
 void GraphManagerVisualizer::update(
@@ -103,6 +132,7 @@ void GraphManagerVisualizer::publishRelativeMarkers(
     if (parent_itr == relative_parent_map.cend()) {
       continue;
     }
+    std::cout << "Parent found for node " << i << std::endl;
 
     gtsam::Pose3 const parent_pose = result.at<gtsam::Pose3>(X(i));
     geometry_msgs::msg::Point parent_pt;
@@ -131,7 +161,6 @@ void GraphManagerVisualizer::publishRelativeMarkers(
       child_pt.z = child_pose.translation().z();
 
       // Add parent and child points to marker msg
-      // TODO(lbern): why are we re-adding the parent?
       relative_marker_msg_.points.emplace_back(parent_pt);
       relative_marker_msg_.points.emplace_back(child_pt);
       relative_marker_msg_.colors.emplace_back(color);
@@ -158,6 +187,9 @@ void GraphManagerVisualizer::publishAnchorMarkers(
     p.y = anchor_itr->second.translation().y();
     p.z = anchor_itr->second.translation().z();
     anchor_marker_msg_.points.emplace_back(p);
+  }
+  if (!anchor_marker_msg_.points.empty()) {
+    publisher_.publish(anchor_marker_msg_, "/constraint_markers");
   }
 }
 
