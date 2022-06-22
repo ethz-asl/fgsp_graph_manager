@@ -51,9 +51,9 @@ class GraphManager {
   }
   void updateKeyRelativeFactorIdxMap(
       const gtsam::Key parent_key, const gtsam::Key child_key);
-  int findRelativeFactorIdx(
+  auto findRelativeFactorIdx(
       const gtsam::Key parent_key, const gtsam::Key child_key,
-      bool erase = false);
+      bool erase = false) -> int;
 
   // Factor count increment and retreivel
   void incFactorCount() { ++factor_count_; }

@@ -209,7 +209,7 @@ void GraphManager::processAnchorConstraints(nav_msgs::msg::Path const& path) {
               "\033[36mANCHOR\033[0m - Found Key: " + std::to_string(key) +
               ", ts: " + std::to_string(ts) + ", Equal: \033[31mNO\033[0m" +
               ", Removing Prior with Index: " + std::to_string(itr->second));
-        remove_factor_idx.push_back(itr->second);
+        remove_factor_idx.emplace_back(itr->second);
       } else if (config_.verbose)
         logger.logInfo(
             "\033[36mANCHOR\033[0m - Found Key: " + std::to_string(key) +
@@ -289,7 +289,7 @@ void GraphManager::processRelativeConstraints(nav_msgs::msg::Path const& path) {
           gtsam::FactorIndices remove_factor_idx;
           int rmIdx = findRelativeFactorIdx(parent_key, child_key, true);
           if (rmIdx != -1)
-            remove_factor_idx.push_back(rmIdx);
+            remove_factor_idx.emplace_back(rmIdx);
 
           // Add relative-relative BetweenFactor
           static auto relativeNoise =
@@ -418,8 +418,9 @@ void GraphManager::updateKeyRelativeFactorIdxMap(
   relative_parent_child_key_map_[parent_key].emplace(child_key);
 }
 
-int GraphManager::findRelativeFactorIdx(
-    const gtsam::Key parent_key, const gtsam::Key child_key, bool erase) {
+auto GraphManager::findRelativeFactorIdx(
+    const gtsam::Key parent_key, const gtsam::Key child_key, bool erase)
+    -> int {
   // Get sets of constraint indices at graph keys
   auto& p_set = key_relative_factor_idx_map_[parent_key];
   auto& c_set = key_relative_factor_idx_map_[child_key];

@@ -1,8 +1,8 @@
 #pragma once
 
-#include <iostream>
 #include <rclcpp/rclcpp.hpp>
 #include <string>
+#include <vector>
 
 namespace fgsp {
 
