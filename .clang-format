@@ -1,8 +1,16 @@
 BasedOnStyle: Google
-ColumnLimit: 0
+ColumnLimit: 80
 IndentWidth: 2
 BreakBeforeBraces: Attach
 DerivePointerAlignment: false
 PointerAlignment: Left
 AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLoopsOnASingleLine: false
+AlignAfterOpenBracket: AlwaysBreak
 IncludeBlocks: Preserve
+IncludeCategories:
+  - Regex: "^<.*"
+    Priority: 1
+  - Regex: ".*"
+    Priority: 2

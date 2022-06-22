@@ -12,10 +12,12 @@ class GraphManagerPublisher {
 
   template <typename T>
   void publish(const T& msg, const std::string& topic) {
-    auto publisher = std::dynamic_pointer_cast<rclcpp::Publisher<T>>(publishers_[topic]);
+    auto publisher =
+        std::dynamic_pointer_cast<rclcpp::Publisher<T>>(publishers_[topic]);
     if (!publisher) {
       publisher = node_.create_publisher<T>(topic, 10);
-      publishers_[topic] = std::dynamic_pointer_cast<rclcpp::PublisherBase>(publisher);
+      publishers_[topic] =
+          std::dynamic_pointer_cast<rclcpp::PublisherBase>(publisher);
     }
     publisher->publish(msg);
   }

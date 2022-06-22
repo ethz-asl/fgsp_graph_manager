@@ -6,7 +6,8 @@ namespace fgsp {
 
 using gtsam::symbol_shorthand::X;  // Pose3 (R,t)
 
-GraphManagerVisualizer::GraphManagerVisualizer(GraphManagerConfig const& config, GraphManagerPublisher& publisher)
+GraphManagerVisualizer::GraphManagerVisualizer(
+    GraphManagerConfig const& config, GraphManagerPublisher& publisher)
     : config_(config), publisher_(publisher) {
   optimized_path_msg_.header.frame_id = "map";
 }
@@ -21,11 +22,14 @@ void GraphManagerVisualizer::clear() {
   optimized_path_msg_.header.stamp = publisher_.getTimeNow();
 }
 
-void GraphManagerVisualizer::update(gtsam::Values const& result, std::unordered_map<gtsam::Key, double> const& keyTimestampMap) {
+void GraphManagerVisualizer::update(
+    gtsam::Values const& result,
+    std::unordered_map<gtsam::Key, double> const& keyTimestampMap) {
   publishOptimizedPath(result, keyTimestampMap);
 }
 
-bool GraphManagerVisualizer::createPoseMessage(gtsam::Pose3 const& pose, geometry_msgs::msg::PoseStamped* pose_msg) const {
+bool GraphManagerVisualizer::createPoseMessage(
+    gtsam::Pose3 const& pose, geometry_msgs::msg::PoseStamped* pose_msg) const {
   if (pose_msg == nullptr) {
     return false;
   }
@@ -40,7 +44,9 @@ bool GraphManagerVisualizer::createPoseMessage(gtsam::Pose3 const& pose, geometr
   return true;
 }
 
-void GraphManagerVisualizer::publishOptimizedPath(gtsam::Values const& result, std::unordered_map<gtsam::Key, double> const& keyTimestampMap) {
+void GraphManagerVisualizer::publishOptimizedPath(
+    gtsam::Values const& result,
+    std::unordered_map<gtsam::Key, double> const& keyTimestampMap) {
   // Loop through result values - Result in absolute frame
   const std::size_t n_result = result.size();
   for (std::size_t i = 0u; i < n_result; ++i) {
@@ -49,7 +55,9 @@ void GraphManagerVisualizer::publishOptimizedPath(gtsam::Values const& result, s
     // Create pose message.
     geometry_msgs::msg::PoseStamped pose_msg;
     pose_msg.header.frame_id = "map";
-    pose_msg.header.stamp = rclcpp::Time(keyTimestampMap.at(i));  // Publish each pose at timestamp corresponding to node in the graph (Note: ts=0 in case of map lookup failure)
+    pose_msg.header.stamp = rclcpp::Time(keyTimestampMap.at(
+        i));  // Publish each pose at timestamp corresponding to node in the
+              // graph (Note: ts=0 in case of map lookup failure)
     createPoseMessage(T_G_B, &pose_msg);
     optimized_path_msg_.poses.emplace_back(pose_msg);
   }

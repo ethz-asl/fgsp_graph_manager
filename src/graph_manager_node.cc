@@ -7,8 +7,7 @@
 
 #include "graph_manager/graph_manager_logger.h"
 
-GraphManagerNode::GraphManagerNode()
-    : rclcpp::Node("graph_manager") {
+GraphManagerNode::GraphManagerNode() : rclcpp::Node("graph_manager") {
   auto& logger = fgsp::GraphManagerLogger::getInstance();
   logger.logInfo("Initializing Graph Manager...");
 
@@ -23,20 +22,32 @@ GraphManagerNode::GraphManagerNode()
     return;
   }
 
-  visualizer_ = std::make_unique<fgsp::GraphManagerVisualizer>(*config_, *publisher_);
-  manager_ = std::make_unique<fgsp::GraphManager>(*config_, *publisher_, *visualizer_);
+  visualizer_ =
+      std::make_unique<fgsp::GraphManagerVisualizer>(*config_, *publisher_);
+  manager_ =
+      std::make_unique<fgsp::GraphManager>(*config_, *publisher_, *visualizer_);
 
   odom_sub_ = create_subscription<nav_msgs::msg::Odometry>(
-      config_->odom_topic, 10, std::bind(&fgsp::GraphManager::odometryCallback, manager_.get(), std::placeholders::_1));
+      config_->odom_topic, 10,
+      std::bind(
+          &fgsp::GraphManager::odometryCallback, manager_.get(),
+          std::placeholders::_1));
 
   anchor_sub_ = create_subscription<nav_msgs::msg::Path>(
-      config_->anchor_topic, 10, std::bind(&fgsp::GraphManager::processAnchorConstraints, manager_.get(), std::placeholders::_1));
+      config_->anchor_topic, 10,
+      std::bind(
+          &fgsp::GraphManager::processAnchorConstraints, manager_.get(),
+          std::placeholders::_1));
 
   relative_sub_ = create_subscription<nav_msgs::msg::Path>(
-      config_->relative_topic, 10, std::bind(&fgsp::GraphManager::processRelativeConstraints, manager_.get(), std::placeholders::_1));
+      config_->relative_topic, 10,
+      std::bind(
+          &fgsp::GraphManager::processRelativeConstraints, manager_.get(),
+          std::placeholders::_1));
 
-  timer_ = create_wall_timer(std::chrono::milliseconds(config_->update_interval_ms),
-                             std::bind(&fgsp::GraphManager::updateGraphResults, manager_.get()));
+  timer_ = create_wall_timer(
+      std::chrono::milliseconds(config_->update_interval_ms),
+      std::bind(&fgsp::GraphManager::updateGraphResults, manager_.get()));
 
   logger.logInfo("Subscribed input odometry to " + config_->odom_topic);
   logger.logInfo("Graph Manager initialized");
