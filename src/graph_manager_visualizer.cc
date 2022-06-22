@@ -22,17 +22,17 @@ GraphManagerVisualizer::GraphManagerVisualizer(
   anchor_marker_msg_.pose.orientation.w = 1.0;
 
   relative_marker_msg_ = anchor_marker_msg_;
-  relative_marker_msg_.ns = "submap_relative_constraints";
+  relative_marker_msg_.ns = "relative_constraints";
   relative_marker_msg_.type = visualization_msgs::msg::Marker::LINE_LIST;
   relative_marker_msg_.scale.x = 0.05f;
 
   relative_parent_marker_msg_ = anchor_marker_msg_;
-  relative_parent_marker_msg_.ns = "submap_parent_nodes";
+  relative_parent_marker_msg_.ns = "relative_parent_nodes";
   relative_parent_marker_msg_.type =
       visualization_msgs::msg::Marker::SPHERE_LIST;
 
   relative_text_marker_msg_ = anchor_marker_msg_;
-  relative_text_marker_msg_.ns = "submap_num_children";
+  relative_text_marker_msg_.ns = "relative_num_children";
   relative_text_marker_msg_.type =
       visualization_msgs::msg::Marker::TEXT_VIEW_FACING;
   relative_text_marker_msg_.color.a = relative_text_marker_msg_.color.r =
@@ -97,7 +97,6 @@ auto GraphManagerVisualizer::createPoseMessage(
 void GraphManagerVisualizer::publishOptimizedPath(
     gtsam::Values const& result,
     std::unordered_map<gtsam::Key, double> const& key_timestamp_map) {
-  // Loop through result values - Result in absolute frame
   std::size_t const n_result = result.size();
   for (std::size_t i = 0u; i < n_result; ++i) {
     gtsam::Pose3 T_G_B = result.at<gtsam::Pose3>(X(i));

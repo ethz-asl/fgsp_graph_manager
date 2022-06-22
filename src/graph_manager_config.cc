@@ -31,27 +31,11 @@ GraphManagerConfig* GraphManagerConfig::init(rclcpp::Node& node) {
 
   // Frames
   config->verbose = parser.get_parameter("verbose", config->verbose);
-  config->world_frame =
-      parser.get_parameter("world_frame", config->world_frame);
   config->map_frame = parser.get_parameter("map_frame", config->map_frame);
-  config->base_frame = parser.get_parameter("base_frame", config->base_frame);
-
-  // Operation
-  config->pos_delta = parser.get_parameter("pos_delta", config->pos_delta);
-  config->rot_delta = parser.get_parameter("rot_delta", config->rot_delta);
-
-  // Calibration
-  config->lidar_frame =
-      parser.get_parameter("lidar_frame", config->lidar_frame);
-  config->camera_frame =
-      parser.get_parameter("camera_frame", config->camera_frame);
-  config->imu_frame = parser.get_parameter("imu_frame", config->imu_frame);
 
   // Noise parameters
   config->odom_noise_std =
       parser.get_parameter("odom_noise_std", config->odom_noise_std);
-  config->absolute_noise_std =
-      parser.get_parameter("absolute_noise_std", config->absolute_noise_std);
   config->relative_noise_std =
       parser.get_parameter("relative_noise_std", config->relative_noise_std);
   config->anchor_noise_std =
@@ -67,12 +51,11 @@ GraphManagerConfig* GraphManagerConfig::init(rclcpp::Node& node) {
       parser.get_parameter("update_interval_ms", config->update_interval_ms);
 
   config->T_O_B = parser.get_parameter("T_O_B", config->T_O_B);
-  config->T_B_C = parser.get_parameter("T_B_C", config->T_B_C);
 
   return config;
 }
 
-bool GraphManagerConfig::isValid() const {
+auto GraphManagerConfig::isValid() const -> bool {
   auto& logger = GraphManagerLogger::getInstance();
   if (odom_noise_std.size() != 6u) {
     logger.logError(
@@ -81,23 +64,16 @@ bool GraphManagerConfig::isValid() const {
     return false;
   }
 
-  if (absolute_noise_std.size() != 6u) {
-    logger.logError(
-        "GraphManager - Absolute noise std vector has wrong size: " +
-        std::to_string(absolute_noise_std.size()));
-    return false;
-  }
-
   if (relative_noise_std.size() != 6u) {
     logger.logError(
-        "GraphManager - Absolute noise std vector has wrong size: " +
+        "GraphManager - Relative constraint noise std vector has wrong size: " +
         std::to_string(relative_noise_std.size()));
     return false;
   }
 
   if (anchor_noise_std.size() != 6u) {
     logger.logError(
-        "GraphManager - Absolute noise std vector has wrong size: " +
+        "GraphManager - Anchor constraint noise std vector has wrong size: " +
         std::to_string(anchor_noise_std.size()));
     return false;
   }
@@ -106,13 +82,6 @@ bool GraphManagerConfig::isValid() const {
     logger.logError(
         "GraphManager - T_O_B vector has wrong size: " +
         std::to_string(T_O_B.size()));
-    return false;
-  }
-
-  if (T_B_C.size() != 16u) {
-    logger.logError(
-        "GraphManager - T_B_C vector has wrong size: " +
-        std::to_string(T_B_C.size()));
     return false;
   }
 
