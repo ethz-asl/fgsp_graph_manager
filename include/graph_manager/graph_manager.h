@@ -49,15 +49,15 @@ class GraphManager {
   void addPoseBetweenFactor(
       const gtsam::Key old_key, const gtsam::Key new_key,
       const gtsam::Pose3& pose_delta, const gtsam::Pose3& pose_estimate);
-  //   //Update ISAM graph
+  // Update ISAM graph
   void updateGraphResults();
 
-  //   //Utility methods
+  // Utility methods
   bool createPoseMessage(
       const gtsam::Pose3& pose,
       geometry_msgs::msg::PoseStamped* pose_msg) const;
 
-  //   //Lookup maps for key-factor association
+  // Lookup maps for key-factor association
   void updateKeyAnchorFactorIdxMap(const gtsam::Key key) {
     key_anchor_factor_idx_map_[key] = factor_count_ - 1;
   }
@@ -70,23 +70,20 @@ class GraphManager {
       const gtsam::Key parent_key, const gtsam::Key child_key,
       bool erase = false);
 
-  //   //Factor count increment and retreivel
+  // Factor count increment and retreivel
   void incFactorCount() { ++factor_count_; }
   auto getFactorCount() -> std::size_t { return factor_count_; }
 
-  gtsam::Pose3 T_O_B_;      // IMU(B) to Odometry(O)
-  gtsam::Pose3 T_B_C_;      // Camera(C) to  IMU(B)
-  gtsam::Pose3 T_G_B_inc_;  // IMU to Global(G) - incremental
+  gtsam::Pose3 T_O_B_;      // Base(B) to Odometry(O)
+  gtsam::Pose3 T_M_B_inc_;  // Base(B) to Map(M) - incremental
 
   // Factor graph
-  std::size_t factor_count_ =
-      0;                       // Counter for Total factors (existing + removed)
-  std::mutex graph_mutex_;     // For adding new factors and graph update
-  gtsam::ISAM2Params params_;  // Graph parameters
-  gtsam::NonlinearFactorGraph
-      new_factors_;                      // New factors to be added to the graph
-  std::shared_ptr<gtsam::ISAM2> graph_;  // iSAM2 GRAPH object
-  gtsam::Key state_key_ = 0;             // Current state key
+  std::size_t factor_count_ = 0u;  // Total factors (existing + removed)
+  std::mutex graph_mutex_;         // For adding new factors and graph update
+  gtsam::ISAM2Params params_;      // Graph parameters
+  gtsam::NonlinearFactorGraph new_factors_;  // Factors to be added to the graph
+  std::shared_ptr<gtsam::ISAM2> graph_;      // iSAM2 GRAPH object
+  gtsam::Key state_key_ = 0;                 // Current state key
 
   // Factor noise vectors - ORDER RPY(rad) - XYZ(meters)
   gtsam::Vector6 odom_noise_;      // Odometry BetweenFactor Noise

@@ -51,7 +51,6 @@ GraphManagerConfig* GraphManagerConfig::init(rclcpp::Node& node) {
       parser.get_parameter("update_interval_ms", config->update_interval_ms);
 
   config->T_O_B = parser.get_parameter("T_O_B", config->T_O_B);
-  config->T_B_C = parser.get_parameter("T_B_C", config->T_B_C);
 
   return config;
 }
@@ -83,13 +82,6 @@ auto GraphManagerConfig::isValid() const -> bool {
     logger.logError(
         "GraphManager - T_O_B vector has wrong size: " +
         std::to_string(T_O_B.size()));
-    return false;
-  }
-
-  if (T_B_C.size() != 16u) {
-    logger.logError(
-        "GraphManager - T_B_C vector has wrong size: " +
-        std::to_string(T_B_C.size()));
     return false;
   }
 

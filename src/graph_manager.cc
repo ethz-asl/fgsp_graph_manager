@@ -40,15 +40,9 @@ GraphManager::GraphManager(
   T_O_B_ = gtsam::Pose3(
       gtsam::Rot3(T_O_B.block(0, 0, 3, 3)), T_O_B.block(0, 3, 3, 1));
 
-  auto T_B_C =
-      Eigen::Map<const Eigen::Matrix<double, 4, 4>>(config.T_B_C.data());
-  T_B_C_ = gtsam::Pose3(
-      gtsam::Rot3(T_B_C.block(0, 0, 3, 3)), T_B_C.block(0, 3, 3, 1));
-
   // TODO(lbern): Move to logger
   ss.clear();
-  ss << "T_O_B: " << T_O_B_.matrix().format(clean_fmt) << "\n"
-     << "T_B_C: " << T_B_C_.matrix().format(clean_fmt) << "\n";
+  ss << "T_O_B: " << T_O_B_.matrix().format(clean_fmt) << "\n";
   logger.logInfo(ss.str());
 
   // Set factor graph params
@@ -110,16 +104,16 @@ void GraphManager::odometryCallback(nav_msgs::msg::Odometry const& odom) {
       // Update keys
       auto old_key = stateKey();
       new_key = newStateKey();
-      // Calculate new IMU pose estimate in G
-      gtsam::Pose3 T_G_B = T_G_B_inc_ * T_B1_B2;
+      // Calculate new IMU pose estimate in M
+      gtsam::Pose3 T_M_B = T_M_B_inc_ * T_B1_B2;
       // Add delta and estimate as between factor
-      addPoseBetweenFactor(old_key, new_key, T_B1_B2, T_G_B);
+      addPoseBetweenFactor(old_key, new_key, T_B1_B2, T_M_B);
     }
     // Update Timestamp-Key & Key-Timestamp Map
     timestamp_key_map_[ts] = new_key;
     key_timestamp_map_[new_key] = ts;
     // Get updated result
-    T_G_B_inc_ = graph_->calculateEstimate<gtsam::Pose3>(X(new_key));
+    T_M_B_inc_ = graph_->calculateEstimate<gtsam::Pose3>(X(new_key));
   }
   auto t2 = std::chrono::high_resolution_clock::now();
 
@@ -179,7 +173,7 @@ void GraphManager::processAnchorConstraints(nav_msgs::msg::Path const& path) {
 
       // Create Update pose
       const auto& p = pose_msg.pose;
-      const gtsam::Pose3 T_G_B(
+      const gtsam::Pose3 T_M_B(
           gtsam::Rot3(
               p.orientation.w, p.orientation.x, p.orientation.y,
               p.orientation.z),
@@ -188,7 +182,7 @@ void GraphManager::processAnchorConstraints(nav_msgs::msg::Path const& path) {
       // Compare if anchor pose on same key has changed
       auto anchor_itr = key_anchor_pose_map_.find(key);
       if (anchor_itr != key_anchor_pose_map_.end()) {
-        bool equal = anchor_itr->second.equals(T_G_B, 0.2);
+        bool equal = anchor_itr->second.equals(T_M_B, 0.2);
         if (equal) {
           if (config_.verbose)
             logger.logInfo(
@@ -219,7 +213,7 @@ void GraphManager::processAnchorConstraints(nav_msgs::msg::Path const& path) {
       static auto anchorNoise =
           gtsam::noiseModel::Diagonal::Sigmas(anchor_noise_);
       new_factors_.emplace_shared<gtsam::PriorFactor<gtsam::Pose3>>(
-          X(key), T_G_B, anchorNoise);
+          X(key), T_M_B, anchorNoise);
       graph_->update(new_factors_, gtsam::Values(), remove_factor_idx);
       new_factors_.resize(0);  // Reset
       incFactorCount();
@@ -227,7 +221,7 @@ void GraphManager::processAnchorConstraints(nav_msgs::msg::Path const& path) {
       // Assosicate index of new prior factor to graph key
       updateKeyAnchorFactorIdxMap(key);
       // Associate Anchor pose to key
-      updateKeyAnchorPoseMap(key, T_G_B);
+      updateKeyAnchorPoseMap(key, T_M_B);
     }
     auto t2 = std::chrono::high_resolution_clock::now();
     if (config_.verbose)

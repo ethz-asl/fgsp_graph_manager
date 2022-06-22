@@ -25,8 +25,6 @@ struct GraphManagerConfig {
   // Extrinsic calibrations
   std::vector<double> T_O_B = {1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
                                0.0, 0.0, 0.0, 0.0, 1.0, 0.0};
-  std::vector<double> T_B_C = {1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
-                               0.0, 0.0, 0.0, 0.0, 1.0, 0.0};
 
   static GraphManagerConfig* init(rclcpp::Node& node);
   auto isValid() const -> bool;
