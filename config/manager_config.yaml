@@ -8,7 +8,6 @@ graph_manager:
     rot_delta: 0.2 # Delta rotation (radian) occured before saving cloud
 
     odom_noise_std: [0.05, 0.05, 0.05, 0.1, 0.1, 0.1] # Noise of Odometry factors - ORDER RPY(rad) - XYZ(m)
-    absolute_noise_std: [1.0e-06, 1.0e-06, 1.0e-06, 1.0e-06, 1.0e-06, 1.0e-06] # Noise of Absolute factors at position 0- ORDER RPY(rad) - XYZ(m)
     relative_noise_std: [1.0e-03, 1.0e-03, 1.0e-03, 1.0e-03, 1.0e-03, 1.0e-03] # Noise of relative Submap factors - ORDER RPY(rad) - XYZ(m)
     anchor_noise_std: [1.0e-05, 1.0e-05, 1.0e-05, 1.0e-05, 1.0e-05, 1.0e-05] # Noise of anchor factors - ORDER RPY(rad) - XYZ(m)
 

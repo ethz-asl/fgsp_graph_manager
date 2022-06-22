@@ -40,8 +40,6 @@ GraphManagerConfig* GraphManagerConfig::init(rclcpp::Node& node) {
   // Noise parameters
   config->odom_noise_std =
       parser.get_parameter("odom_noise_std", config->odom_noise_std);
-  config->absolute_noise_std =
-      parser.get_parameter("absolute_noise_std", config->absolute_noise_std);
   config->relative_noise_std =
       parser.get_parameter("relative_noise_std", config->relative_noise_std);
   config->anchor_noise_std =
@@ -71,23 +69,16 @@ bool GraphManagerConfig::isValid() const {
     return false;
   }
 
-  if (absolute_noise_std.size() != 6u) {
-    logger.logError(
-        "GraphManager - Absolute noise std vector has wrong size: " +
-        std::to_string(absolute_noise_std.size()));
-    return false;
-  }
-
   if (relative_noise_std.size() != 6u) {
     logger.logError(
-        "GraphManager - Absolute noise std vector has wrong size: " +
+        "GraphManager - Relative constraint noise std vector has wrong size: " +
         std::to_string(relative_noise_std.size()));
     return false;
   }
 
   if (anchor_noise_std.size() != 6u) {
     logger.logError(
-        "GraphManager - Absolute noise std vector has wrong size: " +
+        "GraphManager - Anchor constraint noise std vector has wrong size: " +
         std::to_string(anchor_noise_std.size()));
     return false;
   }

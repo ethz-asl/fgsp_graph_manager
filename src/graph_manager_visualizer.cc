@@ -97,7 +97,6 @@ auto GraphManagerVisualizer::createPoseMessage(
 void GraphManagerVisualizer::publishOptimizedPath(
     gtsam::Values const& result,
     std::unordered_map<gtsam::Key, double> const& key_timestamp_map) {
-  // Loop through result values - Result in absolute frame
   std::size_t const n_result = result.size();
   for (std::size_t i = 0u; i < n_result; ++i) {
     gtsam::Pose3 T_G_B = result.at<gtsam::Pose3>(X(i));

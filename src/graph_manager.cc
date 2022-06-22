@@ -26,8 +26,6 @@ GraphManager::GraphManager(
 
   odom_noise_ = Eigen::Map<const Eigen::Matrix<double, 6, 1>>(
       config.odom_noise_std.data());
-  absolute_noise_ = Eigen::Map<const Eigen::Matrix<double, 6, 1>>(
-      config.absolute_noise_std.data());
   relative_noise_ = Eigen::Map<const Eigen::Matrix<double, 6, 1>>(
       config.relative_noise_std.data());
   anchor_noise_ = Eigen::Map<const Eigen::Matrix<double, 6, 1>>(
@@ -38,8 +36,6 @@ GraphManager::GraphManager(
   std::stringstream ss;
   ss << "GraphManager - Odometry Factor Noise: "
      << odom_noise_.transpose().format(clean_fmt) << "\n"
-     << "GraphManager - Absolute Factor Noise: "
-     << absolute_noise_.transpose().format(clean_fmt) << "\n"
      << "GraphManager - Submap Factor Noise: "
      << relative_noise_.transpose().format(clean_fmt) << "\n"
      << "GraphManager - Anchor Factor Noise: "
@@ -173,7 +169,6 @@ void GraphManager::processAnchorConstraints(nav_msgs::msg::Path const& path) {
         continue;
       }
 
-      // Only Absolute poses can be attached to Key 0
       if (key == 0)
         continue;
 

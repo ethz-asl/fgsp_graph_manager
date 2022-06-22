@@ -90,7 +90,6 @@ class GraphManager {
 
   // Factor noise vectors - ORDER RPY(rad) - XYZ(meters)
   gtsam::Vector6 odom_noise_;      // Odometry BetweenFactor Noise
-  gtsam::Vector6 absolute_noise_;  // Absolute(AprilTag) PriorFactor Noise
   gtsam::Vector6 relative_noise_;  // Relatve BetweenFactor Noise
   gtsam::Vector6 anchor_noise_;    // Anchor PriorFactor Noise
 
