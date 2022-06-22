@@ -36,8 +36,8 @@ GraphManager::GraphManager(
       config.odom_noise_std.data());
   absolute_noise_ = Eigen::Map<const Eigen::Matrix<double, 6, 1>>(
       config.absolute_noise_std.data());
-  submap_noise_ = Eigen::Map<const Eigen::Matrix<double, 6, 1>>(
-      config.submap_noise_std.data());
+  relative_noise_ = Eigen::Map<const Eigen::Matrix<double, 6, 1>>(
+      config.relative_noise_std.data());
   anchor_noise_ = Eigen::Map<const Eigen::Matrix<double, 6, 1>>(
       config.anchor_noise_std.data());
 
@@ -49,7 +49,7 @@ GraphManager::GraphManager(
      << "GraphManager - Absolute Factor Noise: "
      << absolute_noise_.transpose().format(clean_fmt) << "\n"
      << "GraphManager - Submap Factor Noise: "
-     << submap_noise_.transpose().format(clean_fmt) << "\n"
+     << relative_noise_.transpose().format(clean_fmt) << "\n"
      << "GraphManager - Anchor Factor Noise: "
      << anchor_noise_.transpose().format(clean_fmt) << "\n";
   logger.logInfo(ss.str());
@@ -296,7 +296,7 @@ void GraphManager::processRelativeConstraints(nav_msgs::msg::Path const& path) {
 
           // Add submap-submap BetweenFactor
           static auto submapNoise =
-              gtsam::noiseModel::Diagonal::Sigmas(submap_noise_);
+              gtsam::noiseModel::Diagonal::Sigmas(relative_noise_);
           const auto& p = path.poses[i].pose;
           gtsam::Pose3 T_B1B2(
               gtsam::Rot3(
@@ -403,7 +403,9 @@ void GraphManager::updateGraphResults() {
 
   // Visualize results
   visualizer_.clear();
-  visualizer_.update(result, keyTimestampMap);
+  visualizer_.update(
+      result, keyTimestampMap, relative_parent_child_key_map_,
+      key_anchor_pose_map_);
 }
 
 bool GraphManager::createPoseMessage(
@@ -429,7 +431,7 @@ void GraphManager::updateKeySubmapFactorIdxMap(
   key_submap_factor_idx_map_[child_key].emplace(factor_idx);
 
   // Save Parent-Child keys for visualization
-  submap_parent_child_key_map_[parent_key].emplace(child_key);
+  relative_parent_child_key_map_[parent_key].emplace(child_key);
   // DEBUG
   //  std::cout << "\033[34mSUBMAP\033[0m NEW Factor added at Index: " <<
   //  factor_idx << ", between keys: " << parent_key << "/" << child_key <<

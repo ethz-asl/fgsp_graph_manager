@@ -91,7 +91,7 @@ class GraphManager {
   // Factor noise vectors - ORDER RPY(rad) - XYZ(meters)
   gtsam::Vector6 odom_noise_;      // Odometry BetweenFactor Noise
   gtsam::Vector6 absolute_noise_;  // Absolute(AprilTag) PriorFactor Noise
-  gtsam::Vector6 submap_noise_;    // Submap BetweenFactor Noise
+  gtsam::Vector6 relative_noise_;  // Relatve BetweenFactor Noise
   gtsam::Vector6 anchor_noise_;    // Anchor PriorFactor Noise
 
   // Odometry factor
@@ -117,8 +117,8 @@ class GraphManager {
                                    // lookup of indices of betweenfactor added
                                    // at key for Submap constraints
   std::unordered_map<gtsam::Key, std::set<gtsam::Key>>
-      submap_parent_child_key_map_;  // Parent-Child keys for visualization of
-                                     // relative submap constrinats
+      relative_parent_child_key_map_;  // Parent-Child keys for visualization of
+                                       // relative constrinats
 
   GraphManagerConfig const& config_;
   GraphManagerPublisher& publisher_;

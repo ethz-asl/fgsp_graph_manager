@@ -26,8 +26,8 @@ struct GraphManagerConfig {
                                         0.01, 0.01};  // rad,rad,rad,m,m,m;
   std::vector<double> absolute_noise_std = {0.01, 0.01, 0.01, 0.01,
                                             0.01, 0.01};  // rad,rad,rad,m,m,m;
-  std::vector<double> submap_noise_std = {0.01, 0.01, 0.01, 0.01,
-                                          0.01, 0.01};  // rad,rad,rad,m,m,m;
+  std::vector<double> relative_noise_std = {0.01, 0.01, 0.01, 0.01,
+                                            0.01, 0.01};  // rad,rad,rad,m,m,m;
   std::vector<double> anchor_noise_std = {0.001, 0.001, 0.001, 0.001,
                                           0.001, 0.001};  // rad,rad,rad,m,m,m;
 

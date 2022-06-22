@@ -3,7 +3,7 @@ graph_manager:
     verbose: 1 # Verbosity level of MaplabIntegrator (0:quiet)
 
     world_frame: darpa # World(Absolute) frame
-    map_frame: world # Robot Map frame
+    map_frame: map # Robot Map frame
     base_frame: imu # Base(IMU) frame
     lidarFrame: imu # LiDAR frame name - used for LiDAR-to-Sensor transform lookup
     camera_frame: camera0 # Frame of camera used for apriltag detection (absolute poses)
@@ -16,7 +16,7 @@ graph_manager:
 
     odom_noise_std: [0.05, 0.05, 0.05, 0.1, 0.1, 0.1] # Noise of Odometry factors - ORDER RPY(rad) - XYZ(m)
     absolute_noise_std: [1.0e-06, 1.0e-06, 1.0e-06, 1.0e-06, 1.0e-06, 1.0e-06] # Noise of Absolute factors at position 0- ORDER RPY(rad) - XYZ(m)
-    submap_noise_std: [1.0e-03, 1.0e-03, 1.0e-03, 1.0e-03, 1.0e-03, 1.0e-03] # Noise of relative Submap factors - ORDER RPY(rad) - XYZ(m)
+    relative_noise_std: [1.0e-03, 1.0e-03, 1.0e-03, 1.0e-03, 1.0e-03, 1.0e-03] # Noise of relative Submap factors - ORDER RPY(rad) - XYZ(m)
     anchor_noise_std: [1.0e-05, 1.0e-05, 1.0e-05, 1.0e-05, 1.0e-05, 1.0e-05] # Noise of anchor factors - ORDER RPY(rad) - XYZ(m)
 
     update_interval_ms: 5000 # Interval(ms) at which graph is optimized
