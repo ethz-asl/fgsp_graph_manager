@@ -15,14 +15,7 @@ GraphManager::GraphManager(
   logger.logInfo(
       "GraphManager - Verbosity level set to: " +
       std::to_string(config.verbose));
-  logger.logInfo("GraphManager - Robot Map frame set to: " + config.map_frame);
-
-  logger.logInfo(
-      "GraphManager - Minimum Position(m) delta Norm: " +
-      std::to_string(config.pos_delta));
-  logger.logInfo(
-      "GraphManager - Minimum Rotation(rad) delta Norm: " +
-      std::to_string(config.rot_delta));
+  logger.logInfo("GraphManager - Robot map frame set to: " + config.map_frame);
 
   odom_noise_ = Eigen::Map<const Eigen::Matrix<double, 6, 1>>(
       config.odom_noise_std.data());
@@ -34,11 +27,11 @@ GraphManager::GraphManager(
   // TODO(lbern): Move to logger
   Eigen::IOFormat clean_fmt(4, 0, ", ", "\n", "[", "]");
   std::stringstream ss;
-  ss << "GraphManager - Odometry Factor Noise: "
+  ss << "GraphManager - Odometry factor noise: "
      << odom_noise_.transpose().format(clean_fmt) << "\n"
-     << "GraphManager - Submap Factor Noise: "
+     << "GraphManager - Relative factor noise: "
      << relative_noise_.transpose().format(clean_fmt) << "\n"
-     << "GraphManager - Anchor Factor Noise: "
+     << "GraphManager - Anchor factor noise: "
      << anchor_noise_.transpose().format(clean_fmt) << "\n";
   logger.logInfo(ss.str());
 
@@ -79,6 +72,12 @@ GraphManager::GraphManager(
 }
 
 void GraphManager::odometryCallback(nav_msgs::msg::Odometry const& odom) {
+  if (graph_ == nullptr) {
+    const auto& logger = GraphManagerLogger::getInstance();
+    logger.logError(
+        "GraphManager - Graph is nullptr, cannot add odometry message");
+    return;
+  }
   // Current timestamp and odom pose
   const double ts = odom.header.stamp.sec * 1e9 + odom.header.stamp.nanosec;
   const auto& p = odom.pose.pose;
@@ -139,8 +138,14 @@ void GraphManager::odometryCallback(nav_msgs::msg::Odometry const& odom) {
 }
 
 void GraphManager::processAnchorConstraints(nav_msgs::msg::Path const& path) {
-  // Check if empty message
   auto const& logger = GraphManagerLogger::getInstance();
+  if (graph_ == nullptr) {
+    const auto& logger = GraphManagerLogger::getInstance();
+    logger.logError(
+        "GraphManager - Graph is nullptr, cannot process anchor "
+        "constraints.");
+    return;
+  }
   if (first_odom_msg_) {
     logger.logError("First odometry message has not been received yet!");
     return;
@@ -219,10 +224,10 @@ void GraphManager::processAnchorConstraints(nav_msgs::msg::Path const& path) {
       new_factors_.resize(0);  // Reset
       incFactorCount();
 
-      // Update lookup maps
-      updateKeyAnchorFactorIdxMap(
-          key);  // Assosicate index of new prior factor to graph key
-      updateKeyAnchorPoseMap(key, T_G_B);  // Associate Anchor pose to key
+      // Assosicate index of new prior factor to graph key
+      updateKeyAnchorFactorIdxMap(key);
+      // Associate Anchor pose to key
+      updateKeyAnchorPoseMap(key, T_G_B);
     }
     auto t2 = std::chrono::high_resolution_clock::now();
     if (config_.verbose)
@@ -236,11 +241,15 @@ void GraphManager::processAnchorConstraints(nav_msgs::msg::Path const& path) {
 
 void GraphManager::processRelativeConstraints(nav_msgs::msg::Path const& path) {
   auto const& logger = GraphManagerLogger::getInstance();
-  // Check if empty message
+  if (graph_ == nullptr) {
+    const auto& logger = GraphManagerLogger::getInstance();
+    logger.logError(
+        "GraphManager - Graph is nullptr, cannot process relative "
+        "constraints.");
+    return;
+  }
   if (first_odom_msg_) {
-    logger.logInfo(
-        "MaplabIntegrator - nullptr passed to Submap callback or graph not "
-        "initialized from odometry yet");
+    logger.logInfo("GraphManager - Graph not initialized from odometry yet");
     return;
   }
 
@@ -252,7 +261,7 @@ void GraphManager::processRelativeConstraints(nav_msgs::msg::Path const& path) {
     auto parent_itr = timestamp_key_map_.find(parent_ts);
     if (parent_itr != timestamp_key_map_.end()) {
       gtsam::Key parent_key = parent_itr->second;
-      // Loop through submap(parent)-submap(child) constraints
+      // Loop through relative(parent)-relative(child) constraints
       auto t1 = std::chrono::high_resolution_clock::now();
       const std::size_t n_poses = path.poses.size();
       for (size_t i = 0; i < n_poses; ++i) {
@@ -270,19 +279,19 @@ void GraphManager::processRelativeConstraints(nav_msgs::msg::Path const& path) {
           if (child_key == parent_key) {
             if (config_.verbose > 0)
               logger.logInfo(
-                  "GraphManager - Same Submap Parent/Child keys, key:" +
+                  "GraphManager - Same relaitve parent/child keys, key:" +
                   std::to_string(child_key));
             continue;
           }
 
           // Check if a previous BetweenFactor exists between two keys
           gtsam::FactorIndices remove_factor_idx;
-          int rmIdx = findSubmapFactorIdx(parent_key, child_key, true);
+          int rmIdx = findRelativeFactorIdx(parent_key, child_key, true);
           if (rmIdx != -1)
             remove_factor_idx.push_back(rmIdx);
 
-          // Add submap-submap BetweenFactor
-          static auto submapNoise =
+          // Add relative-relative BetweenFactor
+          static auto relativeNoise =
               gtsam::noiseModel::Diagonal::Sigmas(relative_noise_);
           const auto& p = path.poses[i].pose;
           gtsam::Pose3 T_B1B2(
@@ -290,36 +299,34 @@ void GraphManager::processRelativeConstraints(nav_msgs::msg::Path const& path) {
                   p.orientation.w, p.orientation.x, p.orientation.y,
                   p.orientation.z),
               gtsam::Point3(p.position.x, p.position.y, p.position.z));
-          gtsam::BetweenFactor<gtsam::Pose3> submapBF(
-              X(parent_key), X(child_key), T_B1B2, submapNoise);
-          new_factors_.add(submapBF);
+          gtsam::BetweenFactor<gtsam::Pose3> relativeBF(
+              X(parent_key), X(child_key), T_B1B2, relativeNoise);
+          new_factors_.add(relativeBF);
           // Update Graph
           graph_->update(new_factors_, gtsam::Values(), remove_factor_idx);
           new_factors_.resize(0);
           incFactorCount();
-          updateKeySubmapFactorIdxMap(parent_key, child_key);
+          updateKeyRelativeFactorIdxMap(parent_key, child_key);
           if (config_.verbose > 0)
             logger.logInfo(
-                "\033[34mSUBMAP\033[0m - : P(" + std::to_string(parent_key) +
+                "\033[34mRELATIVE\033[0m - : P(" + std::to_string(parent_key) +
                 ")-C(" + std::to_string(child_key));
         } else
           continue;
       }
       auto t2 = std::chrono::high_resolution_clock::now();
 
-      // DEBUG
       if (config_.verbose > 0)
         logger.logInfo(
-            "\033[34mSUBMAP-UPDATE\033[0m - Constraints added: " +
+            "\033[34mRELATIVE-UPDATE\033[0m - Constraints added: " +
             std::to_string(n_poses) + ", time(ms): " +
             std::to_string(
                 std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1)
                     .count()));
-      // DEBUG
     } else {
       if (config_.verbose > 0)
         logger.logInfo(
-            "\033[34mSUBMAP\033[0m  - Found no key for parent at ts: " +
+            "\033[34mRELATIVE\033[0m  - Found no key for parent at ts: " +
             std::to_string(parent_ts) + " --- SKIPPING CHILDERN ---");
       return;
     }
@@ -374,6 +381,11 @@ void GraphManager::addPoseBetweenFactor(
 }
 
 void GraphManager::updateGraphResults() {
+  if (graph_ == nullptr) {
+    const auto& logger = GraphManagerLogger::getInstance();
+    logger.logError("GraphManager - Graph is nullptr, cannot update results.");
+    return;
+  }
   // Check if graph has initialized
   if (first_odom_msg_)
     return;
@@ -411,25 +423,21 @@ bool GraphManager::createPoseMessage(
   return true;
 }
 
-void GraphManager::updateKeySubmapFactorIdxMap(
+void GraphManager::updateKeyRelativeFactorIdxMap(
     const gtsam::Key parent_key, const gtsam::Key child_key) {
   const std::size_t factor_idx = getFactorCount() - 1u;
-  key_submap_factor_idx_map_[parent_key].emplace(factor_idx);
-  key_submap_factor_idx_map_[child_key].emplace(factor_idx);
+  key_relative_factor_idx_map_[parent_key].emplace(factor_idx);
+  key_relative_factor_idx_map_[child_key].emplace(factor_idx);
 
   // Save Parent-Child keys for visualization
   relative_parent_child_key_map_[parent_key].emplace(child_key);
-  // DEBUG
-  //  std::cout << "\033[34mSUBMAP\033[0m NEW Factor added at Index: " <<
-  //  factor_idx << ", between keys: " << parent_key << "/" << child_key <<
-  //  std::endl;
 }
 
-int GraphManager::findSubmapFactorIdx(
+int GraphManager::findRelativeFactorIdx(
     const gtsam::Key parent_key, const gtsam::Key child_key, bool erase) {
   // Get sets of constraint indices at graph keys
-  auto& p_set = key_submap_factor_idx_map_[parent_key];
-  auto& c_set = key_submap_factor_idx_map_[child_key];
+  auto& p_set = key_relative_factor_idx_map_[parent_key];
+  auto& c_set = key_relative_factor_idx_map_[child_key];
 
   // Find common constraint index between two graph Keys i.e. a BetweenFactor
   // should have same factor index at two graph keys(nodes)
@@ -450,7 +458,8 @@ int GraphManager::findSubmapFactorIdx(
     }
   } else if (result.size() > 1) {
     GraphManagerLogger::getInstance().logInfo(
-        "GraphManager - Submaps connected by mutliple between factors");
+        "GraphManager - Relative constraint connected by mutliple between "
+        "factors");
   }
 
   return output;

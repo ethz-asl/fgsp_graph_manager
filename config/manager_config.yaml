@@ -1,14 +1,11 @@
 graph_manager:
   ros__parameters:
-    verbose: 1 # Verbosity level of MaplabIntegrator (0:quiet)
+    verbose: 1 # Verbosity level (0:quiet)
 
     map_frame: map # Robot Map frame
 
-    pos_delta: 1.0 # Delta translation (meters) occured before saving cloud
-    rot_delta: 0.2 # Delta rotation (radian) occured before saving cloud
-
     odom_noise_std: [0.05, 0.05, 0.05, 0.1, 0.1, 0.1] # Noise of Odometry factors - ORDER RPY(rad) - XYZ(m)
-    relative_noise_std: [1.0e-03, 1.0e-03, 1.0e-03, 1.0e-03, 1.0e-03, 1.0e-03] # Noise of relative Submap factors - ORDER RPY(rad) - XYZ(m)
+    relative_noise_std: [1.0e-03, 1.0e-03, 1.0e-03, 1.0e-03, 1.0e-03, 1.0e-03] # Noise of relative factors - ORDER RPY(rad) - XYZ(m)
     anchor_noise_std: [1.0e-05, 1.0e-05, 1.0e-05, 1.0e-05, 1.0e-05, 1.0e-05] # Noise of anchor factors - ORDER RPY(rad) - XYZ(m)
 
     update_interval_ms: 5000 # Interval(ms) at which graph is optimized

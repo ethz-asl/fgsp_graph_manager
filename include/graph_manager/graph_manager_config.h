@@ -7,13 +7,8 @@
 namespace fgsp {
 
 struct GraphManagerConfig {
-  int verbose = 0u;  // Verbosity level of MaplabIntegrator (0:quiet)
+  int verbose = 0u;  // Verbosity level (0:quiet)
   std::string map_frame = "map";
-
-  double pos_delta = 4.0;  // Minimum delta position difference Norm to save new
-                           // pointcoud (meters)
-  double rot_delta = 0.3;  // Minimum delta rotation difference Norm to save new
-                           // pointcoud (radians)
 
   std::vector<double> odom_noise_std = {0.01, 0.01, 0.01, 0.01,
                                         0.01, 0.01};  // rad,rad,rad,m,m,m;
@@ -25,8 +20,7 @@ struct GraphManagerConfig {
   std::string odom_topic = "/odometry";
   std::string anchor_topic = "/graph_client/anchor_nodes";
   std::string relative_topic = "/graph_client/relative_nodes";
-  int update_interval_ms =
-      10000;  // Update interval at which the graph is optimized (ms)
+  int update_interval_ms = 10000;  // Graph optimization interval (ms)
 
   // Extrinsic calibrations
   std::vector<double> T_O_B = {1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
@@ -35,7 +29,7 @@ struct GraphManagerConfig {
                                0.0, 0.0, 0.0, 0.0, 1.0, 0.0};
 
   static GraphManagerConfig* init(rclcpp::Node& node);
-  bool isValid() const;
+  auto isValid() const -> bool;
 };
 
 }  // namespace fgsp

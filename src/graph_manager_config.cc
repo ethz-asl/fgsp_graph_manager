@@ -33,10 +33,6 @@ GraphManagerConfig* GraphManagerConfig::init(rclcpp::Node& node) {
   config->verbose = parser.get_parameter("verbose", config->verbose);
   config->map_frame = parser.get_parameter("map_frame", config->map_frame);
 
-  // Operation
-  config->pos_delta = parser.get_parameter("pos_delta", config->pos_delta);
-  config->rot_delta = parser.get_parameter("rot_delta", config->rot_delta);
-
   // Noise parameters
   config->odom_noise_std =
       parser.get_parameter("odom_noise_std", config->odom_noise_std);
@@ -60,7 +56,7 @@ GraphManagerConfig* GraphManagerConfig::init(rclcpp::Node& node) {
   return config;
 }
 
-bool GraphManagerConfig::isValid() const {
+auto GraphManagerConfig::isValid() const -> bool {
   auto& logger = GraphManagerLogger::getInstance();
   if (odom_noise_std.size() != 6u) {
     logger.logError(

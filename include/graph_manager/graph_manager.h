@@ -64,9 +64,9 @@ class GraphManager {
   void updateKeyAnchorPoseMap(const gtsam::Key key, const gtsam::Pose3& pose) {
     key_anchor_pose_map_[key] = pose;
   }
-  void updateKeySubmapFactorIdxMap(
+  void updateKeyRelativeFactorIdxMap(
       const gtsam::Key parent_key, const gtsam::Key child_key);
-  int findSubmapFactorIdx(
+  int findRelativeFactorIdx(
       const gtsam::Key parent_key, const gtsam::Key child_key,
       bool erase = false);
 
@@ -112,9 +112,9 @@ class GraphManager {
       key_anchor_pose_map_;  // Key-AnchorPose map for lookup of applied anchor
                              // pose as prior factor at Key
   std::unordered_map<gtsam::Key, std::set<size_t>>
-      key_submap_factor_idx_map_;  // Key-SubmapBetweenFactorIndex map for
-                                   // lookup of indices of betweenfactor added
-                                   // at key for Submap constraints
+      key_relative_factor_idx_map_;  // Key-RelativeBetweenFactorIndex map for
+                                     // lookup of indices of betweenfactor added
+                                     // at key for relative constraints
   std::unordered_map<gtsam::Key, std::set<gtsam::Key>>
       relative_parent_child_key_map_;  // Parent-Child keys for visualization of
                                        // relative constrinats
