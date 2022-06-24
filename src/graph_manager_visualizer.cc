@@ -131,8 +131,6 @@ void GraphManagerVisualizer::publishRelativeMarkers(
     if (parent_itr == relative_parent_map.cend()) {
       continue;
     }
-    std::cout << "Parent found for node " << i << std::endl;
-
     gtsam::Pose3 const parent_pose = result.at<gtsam::Pose3>(X(i));
     geometry_msgs::msg::Point parent_pt;
     parent_pt.x = parent_pose.translation().x();
