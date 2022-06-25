@@ -185,9 +185,7 @@ void GraphManagerVisualizer::publishAnchorMarkers(
     p.z = anchor_itr->second.translation().z();
     anchor_marker_msg_.points.emplace_back(p);
   }
-  if (!anchor_marker_msg_.points.empty()) {
-    publisher_.publish(anchor_marker_msg_, "/constraint_markers");
-  }
+  publisher_.publish(anchor_marker_msg_, "/constraint_markers");
 }
 
 auto GraphManagerVisualizer::createColor(

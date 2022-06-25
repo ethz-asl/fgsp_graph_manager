@@ -27,20 +27,23 @@ GraphManagerNode::GraphManagerNode() : rclcpp::Node("graph_manager") {
   manager_ =
       std::make_unique<fgsp::GraphManager>(*config_, *publisher_, *visualizer_);
 
+  rclcpp::SensorDataQoS qos;
+  qos.keep_last(1000);
+
   odom_sub_ = create_subscription<nav_msgs::msg::Odometry>(
-      config_->odom_topic, 10,
+      config_->odom_topic, qos,
       std::bind(
           &fgsp::GraphManager::odometryCallback, manager_.get(),
           std::placeholders::_1));
 
   anchor_sub_ = create_subscription<nav_msgs::msg::Path>(
-      config_->anchor_topic, 10,
+      config_->anchor_topic, qos,
       std::bind(
           &fgsp::GraphManager::processAnchorConstraints, manager_.get(),
           std::placeholders::_1));
 
   relative_sub_ = create_subscription<nav_msgs::msg::Path>(
-      config_->relative_topic, 10,
+      config_->relative_topic, qos,
       std::bind(
           &fgsp::GraphManager::processRelativeConstraints, manager_.get(),
           std::placeholders::_1));
