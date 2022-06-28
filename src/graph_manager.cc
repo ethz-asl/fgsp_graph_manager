@@ -308,16 +308,16 @@ void GraphManager::processRelativeConstraints(nav_msgs::msg::Path const& path) {
           new_factors_.resize(0);
           incFactorCount();
           updateKeyRelativeFactorIdxMap(parent_key, child_key);
-          if (config_.verbose > 0)
+          if (config_.verbose > 3)
             logger.logInfo(
                 "\033[34mRELATIVE\033[0m - : P(" + std::to_string(parent_key) +
-                ")-C(" + std::to_string(child_key));
+                ")-C(" + std::to_string(child_key) + ")");
         } else
           continue;
       }
       auto t2 = std::chrono::high_resolution_clock::now();
 
-      if (config_.verbose > 0)
+      if (config_.verbose > 1)
         logger.logInfo(
             "\033[34mRELATIVE-UPDATE\033[0m - Constraints added: " +
             std::to_string(n_poses) + ", time(ms): " +
@@ -325,7 +325,7 @@ void GraphManager::processRelativeConstraints(nav_msgs::msg::Path const& path) {
                 std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1)
                     .count()));
     } else {
-      if (config_.verbose > 0)
+      if (config_.verbose > 2)
         logger.logInfo(
             "\033[34mRELATIVE\033[0m  - Found no key for parent at ts: " +
             std::to_string(parent_ts) + " --- SKIPPING CHILDERN ---");
