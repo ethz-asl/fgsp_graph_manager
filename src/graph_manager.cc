@@ -47,11 +47,6 @@ GraphManager::GraphManager(
   T_O_B_ = gtsam::Pose3(
       gtsam::Rot3(T_O_B.block(0, 0, 3, 3)), T_O_B.block(0, 3, 3, 1));
 
-  // TODO(lbern): Move to logger
-  ss.clear();
-  ss << "T_O_B: " << T_O_B_.matrix().format(clean_fmt) << "\n";
-  logger.logInfo(ss.str());
-
   // Set factor graph params
   params_.optimizationParams = gtsam::ISAM2GaussNewtonParams();
   params_.factorization =
