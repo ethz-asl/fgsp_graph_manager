@@ -14,7 +14,7 @@ GraphManagerVisualizer::GraphManagerVisualizer(
   anchor_marker_msg_.type = visualization_msgs::msg::Marker::CUBE_LIST;
   anchor_marker_msg_.action = visualization_msgs::msg::Marker::ADD;
   anchor_marker_msg_.scale.x = anchor_marker_msg_.scale.y =
-      anchor_marker_msg_.scale.z = 0.25f;
+      anchor_marker_msg_.scale.z = 0.8f;
   anchor_marker_msg_.color.r = 0.0f;
   anchor_marker_msg_.color.g = 1.0f;
   anchor_marker_msg_.color.b = 1.0f;
@@ -24,7 +24,7 @@ GraphManagerVisualizer::GraphManagerVisualizer(
   relative_marker_msg_ = anchor_marker_msg_;
   relative_marker_msg_.ns = "relative_constraints";
   relative_marker_msg_.type = visualization_msgs::msg::Marker::LINE_LIST;
-  relative_marker_msg_.scale.x = 0.05f;
+  relative_marker_msg_.scale.x = 0.5f;
 
   relative_parent_marker_msg_ = anchor_marker_msg_;
   relative_parent_marker_msg_.ns = "relative_parent_nodes";
