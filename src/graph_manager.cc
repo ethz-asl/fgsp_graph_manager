@@ -308,7 +308,10 @@ void GraphManager::processRelativeConstraints(nav_msgs::msg::Path const& path) {
                 "\033[34mRELATIVE\033[0m - : P(" + std::to_string(parent_key) +
                 ")-C(" + std::to_string(child_key) + ")");
         } else
-          continue;
+          logger.logInfo(
+              "\033[34mRELATIVE\033[0m - : Child is not associated with a "
+              "key!");
+        continue;
       }
       auto t2 = std::chrono::high_resolution_clock::now();
 
