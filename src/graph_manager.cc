@@ -276,21 +276,23 @@ void GraphManager::processRelativeConstraints(nav_msgs::msg::Path const& path) {
     // Loop through relative(parent)-relative(child) constraints
     auto t1 = std::chrono::high_resolution_clock::now();
     const std::size_t n_poses = path.poses.size();
+    gtsam::Key child_key;
     for (size_t i = 0u; i < n_poses; ++i) {
       const auto child_ts = path.poses[i].header.stamp.sec * 1e9 +
                             path.poses[i].header.stamp.nanosec;
 
       // Check if child is associated to a key
-      auto child_itr = timestamp_key_map_.find(child_ts);
-      if (child_itr == timestamp_key_map_.end()) {
+      if (config_.approximate_ts_lookup) {
+        found = findClosestKeyForTs(child_ts, &child_key);
+      } else {
+        found = findExactKeyForTs(child_ts, &child_key);
+      }
+      if (!found) {
         logger.logInfo(
             "\033[34mRELATIVE\033[0m - : Child is not associated with a "
             "key!");
         continue;
       }
-      gtsam::Key child_key = child_itr->second;
-      // std::cout << std::fixed << ", Child Key : " << child_key << ", ts:
-      // " << child_ts << std::endl;
 
       // Skip if keys are same
       if (child_key == parent_key) {
