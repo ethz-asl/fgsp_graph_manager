@@ -163,10 +163,13 @@ void GraphManager::processAnchorConstraints(nav_msgs::msg::Path const& path) {
 
       // Find corresponding key in graph
       gtsam::Key key;
-      auto key_itr = timestamp_key_map_.find(ts);
-      if (key_itr != timestamp_key_map_.end()) {
-        key = key_itr->second;  // Save Key
+      bool found = false;
+      if (config_.approximate_ts_lookup) {
+        found = findClosestKeyForTs(ts, &key);
       } else {
+        found = findExactKeyForTs(ts, &key);
+      }
+      if (!found) {
         if (config_.verbose)
           logger.logInfo(
               "\033[36mANCHOR\033[0m - Found no closest key for ts: " +
