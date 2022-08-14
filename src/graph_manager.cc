@@ -24,6 +24,10 @@ GraphManager::GraphManager(
       std::to_string(config.verbose));
   logger.logInfo("GraphManager - Robot map frame set to: " + config.map_frame);
 
+  if (config.approximate_ts_lookup) {
+    logger.logWarn("GraphManager - Using approximate TS lookup.");
+  }
+
   odom_noise_ = Eigen::Map<const Eigen::Matrix<double, 6, 1>>(
       config.odom_noise_std.data());
   relative_noise_ = Eigen::Map<const Eigen::Matrix<double, 6, 1>>(
@@ -254,19 +258,25 @@ void GraphManager::processRelativeConstraints(nav_msgs::msg::Path const& path) {
       path.header.stamp.sec * 1e9 + path.header.stamp.nanosec;
   {
     std::lock_guard<std::mutex> lock(graph_mutex_);
-    auto parent_itr = timestamp_key_map_.find(parent_ts);
-    if (parent_itr == timestamp_key_map_.end()) {
+    gtsam::Key parent_key;
+    bool found = false;
+    if (config_.approximate_ts_lookup) {
+      found = findClosestKeyForTs(parent_ts, &parent_key);
+    } else {
+      found = findExactKeyForTs(parent_ts, &parent_key);
+    }
+    if (!found) {
       if (config_.verbose > 2)
         logger.logInfo(
             "\033[34mRELATIVE\033[0m  - Found no key for parent at ts: " +
             std::to_string(parent_ts) + " --- SKIPPING CHILDERN ---");
       return;
     }
-    gtsam::Key parent_key = parent_itr->second;
+
     // Loop through relative(parent)-relative(child) constraints
     auto t1 = std::chrono::high_resolution_clock::now();
     const std::size_t n_poses = path.poses.size();
-    for (size_t i = 0; i < n_poses; ++i) {
+    for (size_t i = 0u; i < n_poses; ++i) {
       const auto child_ts = path.poses[i].header.stamp.sec * 1e9 +
                             path.poses[i].header.stamp.nanosec;
 
@@ -446,6 +456,37 @@ auto GraphManager::findRelativeFactorIdx(
   }
 
   return output;
+}
+
+auto GraphManager::findExactKeyForTs(double ts, gtsam::Key* key) const -> bool {
+  if (key == nullptr || timestamp_key_map_.empty()) {
+    return false;
+  }
+  auto it = timestamp_key_map_.find(ts);
+  if (it == timestamp_key_map_.cend()) {
+    return false;
+  }
+  *key = it->second;
+  return true;
+}
+
+auto GraphManager::findClosestKeyForTs(double ts, gtsam::Key* key) const
+    -> bool {
+  if (key == nullptr || timestamp_key_map_.empty()) {
+    return false;
+  }
+  static constexpr double const& eps = 0.2;  // TODO(lbern): make flag.
+  auto comp = [](const std::pair<double, gtsam::Key>& lhs, const double ts) {
+    return lhs.first + eps < ts;
+  };
+  auto it = std::lower_bound(
+      timestamp_key_map_.cbegin(), timestamp_key_map_.cend(), ts, comp);
+  if (it == timestamp_key_map_.cend()) {
+    return false;
+  }
+
+  *key = it->second;
+  return true;
 }
 
 }  // namespace fgsp

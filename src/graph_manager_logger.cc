@@ -15,8 +15,12 @@ void GraphManagerLogger::logInfo(const std::string& msg) const {
   std::cout << "[INFO] " << msg << "\n";
 }
 
+void GraphManagerLogger::logWarn(const std::string& msg) const {
+  std::cout << "\033[33m[WARNING] " << msg << "\033[0m\n";
+}
+
 void GraphManagerLogger::logError(const std::string& msg) const {
-  std::cerr << "[ERROR] " << msg << "\n";
+  std::cerr << "\033[31m[ERROR] " << msg << "\033[0m\n";
 }
 
 }  // namespace fgsp

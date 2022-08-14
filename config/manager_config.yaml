@@ -9,6 +9,8 @@ graph_manager:
     anchor_noise_std: [1.0e-05, 1.0e-05, 1.0e-05, 1.0e-05, 1.0e-05, 1.0e-05] # Noise of anchor factors - ORDER RPY(rad) - XYZ(m)
 
     update_interval_ms: 5000 # Interval(ms) at which graph is optimized
+    approximate_ts_lookup: false
+    ts_lookup_threshold: 0.1
     odom_topic: "/odometry"
 
     T_O_B:

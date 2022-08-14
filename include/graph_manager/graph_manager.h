@@ -55,6 +55,9 @@ class GraphManager {
       const gtsam::Key parent_key, const gtsam::Key child_key,
       bool erase = false) -> int;
 
+  auto findExactKeyForTs(const double ts, gtsam::Key* key) const -> bool;
+  auto findClosestKeyForTs(const double ts, gtsam::Key* key) const -> bool;
+
   // Factor count increment and retreivel
   void incFactorCount() { ++factor_count_; }
   auto getFactorCount() -> std::size_t { return factor_count_; }
