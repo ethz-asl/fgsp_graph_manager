@@ -255,80 +255,79 @@ void GraphManager::processRelativeConstraints(nav_msgs::msg::Path const& path) {
   {
     std::lock_guard<std::mutex> lock(graph_mutex_);
     auto parent_itr = timestamp_key_map_.find(parent_ts);
-    if (parent_itr != timestamp_key_map_.end()) {
-      gtsam::Key parent_key = parent_itr->second;
-      // Loop through relative(parent)-relative(child) constraints
-      auto t1 = std::chrono::high_resolution_clock::now();
-      const std::size_t n_poses = path.poses.size();
-      for (size_t i = 0; i < n_poses; ++i) {
-        const auto child_ts = path.poses[i].header.stamp.sec * 1e9 +
-                              path.poses[i].header.stamp.nanosec;
-
-        // Check if child is associated to a key
-        auto child_itr = timestamp_key_map_.find(child_ts);
-        if (child_itr != timestamp_key_map_.end()) {
-          gtsam::Key child_key = child_itr->second;
-          // std::cout << std::fixed << ", Child Key : " << child_key << ", ts:
-          // " << child_ts << std::endl;
-
-          // Skip if keys are same
-          if (child_key == parent_key) {
-            if (config_.verbose > 0)
-              logger.logInfo(
-                  "GraphManager - Same relaitve parent/child keys, key:" +
-                  std::to_string(child_key));
-            continue;
-          }
-
-          // Check if a previous BetweenFactor exists between two keys
-          gtsam::FactorIndices remove_factor_idx;
-          int rmIdx = findRelativeFactorIdx(parent_key, child_key, true);
-          if (rmIdx != -1)
-            remove_factor_idx.emplace_back(rmIdx);
-
-          // Add relative-relative BetweenFactor
-          static auto relativeNoise =
-              gtsam::noiseModel::Diagonal::Sigmas(relative_noise_);
-          const auto& p = path.poses[i].pose;
-          gtsam::Pose3 T_B1B2(
-              gtsam::Rot3(
-                  p.orientation.w, p.orientation.x, p.orientation.y,
-                  p.orientation.z),
-              gtsam::Point3(p.position.x, p.position.y, p.position.z));
-          gtsam::BetweenFactor<gtsam::Pose3> relativeBF(
-              X(parent_key), X(child_key), T_B1B2, relativeNoise);
-          new_factors_.add(relativeBF);
-          // Update Graph
-          graph_->update(new_factors_, gtsam::Values(), remove_factor_idx);
-          new_factors_.resize(0);
-          incFactorCount();
-          updateKeyRelativeFactorIdxMap(parent_key, child_key);
-          if (config_.verbose > 3)
-            logger.logInfo(
-                "\033[34mRELATIVE\033[0m - : P(" + std::to_string(parent_key) +
-                ")-C(" + std::to_string(child_key) + ")");
-        } else
-          logger.logInfo(
-              "\033[34mRELATIVE\033[0m - : Child is not associated with a "
-              "key!");
-        continue;
-      }
-      auto t2 = std::chrono::high_resolution_clock::now();
-
-      if (config_.verbose > 1)
-        logger.logInfo(
-            "\033[34mRELATIVE-UPDATE\033[0m - Constraints added: " +
-            std::to_string(n_poses) + ", time(ms): " +
-            std::to_string(
-                std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1)
-                    .count()));
-    } else {
+    if (parent_itr == timestamp_key_map_.end()) {
       if (config_.verbose > 2)
         logger.logInfo(
             "\033[34mRELATIVE\033[0m  - Found no key for parent at ts: " +
             std::to_string(parent_ts) + " --- SKIPPING CHILDERN ---");
       return;
     }
+    gtsam::Key parent_key = parent_itr->second;
+    // Loop through relative(parent)-relative(child) constraints
+    auto t1 = std::chrono::high_resolution_clock::now();
+    const std::size_t n_poses = path.poses.size();
+    for (size_t i = 0; i < n_poses; ++i) {
+      const auto child_ts = path.poses[i].header.stamp.sec * 1e9 +
+                            path.poses[i].header.stamp.nanosec;
+
+      // Check if child is associated to a key
+      auto child_itr = timestamp_key_map_.find(child_ts);
+      if (child_itr == timestamp_key_map_.end()) {
+        logger.logInfo(
+            "\033[34mRELATIVE\033[0m - : Child is not associated with a "
+            "key!");
+        continue;
+      }
+      gtsam::Key child_key = child_itr->second;
+      // std::cout << std::fixed << ", Child Key : " << child_key << ", ts:
+      // " << child_ts << std::endl;
+
+      // Skip if keys are same
+      if (child_key == parent_key) {
+        if (config_.verbose > 0)
+          logger.logInfo(
+              "GraphManager - Same relaitve parent/child keys, key:" +
+              std::to_string(child_key));
+        continue;
+      }
+
+      // Check if a previous BetweenFactor exists between two keys
+      gtsam::FactorIndices remove_factor_idx;
+      int rmIdx = findRelativeFactorIdx(parent_key, child_key, true);
+      if (rmIdx != -1)
+        remove_factor_idx.emplace_back(rmIdx);
+
+      // Add relative-relative BetweenFactor
+      static auto relativeNoise =
+          gtsam::noiseModel::Diagonal::Sigmas(relative_noise_);
+      const auto& p = path.poses[i].pose;
+      gtsam::Pose3 T_B1B2(
+          gtsam::Rot3(
+              p.orientation.w, p.orientation.x, p.orientation.y,
+              p.orientation.z),
+          gtsam::Point3(p.position.x, p.position.y, p.position.z));
+      gtsam::BetweenFactor<gtsam::Pose3> relativeBF(
+          X(parent_key), X(child_key), T_B1B2, relativeNoise);
+      new_factors_.add(relativeBF);
+      // Update Graph
+      graph_->update(new_factors_, gtsam::Values(), remove_factor_idx);
+      new_factors_.resize(0);
+      incFactorCount();
+      updateKeyRelativeFactorIdxMap(parent_key, child_key);
+      if (config_.verbose > 3)
+        logger.logInfo(
+            "\033[34mRELATIVE\033[0m - : P(" + std::to_string(parent_key) +
+            ")-C(" + std::to_string(child_key) + ")");
+    }
+    auto t2 = std::chrono::high_resolution_clock::now();
+
+    if (config_.verbose > 1)
+      logger.logInfo(
+          "\033[34mRELATIVE-UPDATE\033[0m - Constraints added: " +
+          std::to_string(n_poses) + ", time(ms): " +
+          std::to_string(
+              std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1)
+                  .count()));
   }
 }
 
