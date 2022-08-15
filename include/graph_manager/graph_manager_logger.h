@@ -13,6 +13,7 @@ class GraphManagerLogger {
  public:
   static auto getInstance() -> GraphManagerLogger const&;
   void logInfo(const std::string& msg) const;
+  void logWarn(const std::string& msg) const;
   void logError(const std::string& msg) const;
 };
 

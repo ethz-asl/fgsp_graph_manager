@@ -1,6 +1,6 @@
 graph_manager:
   ros__parameters:
-    verbose: 2 # Verbosity level (0:quiet)
+    verbose: 4 # Verbosity level (0:quiet)
 
     map_frame: map # Robot Map frame
 
@@ -9,6 +9,8 @@ graph_manager:
     anchor_noise_std: [1.0e-05, 1.0e-05, 1.0e-05, 1.0e-05, 1.0e-05, 1.0e-05] # Noise of anchor factors - ORDER RPY(rad) - XYZ(m)
 
     update_interval_ms: 5000 # Interval(ms) at which graph is optimized
+    approximate_ts_lookup: true
+    ts_lookup_threshold: 0.01
     odom_topic: "/odometry"
 
     T_O_B:

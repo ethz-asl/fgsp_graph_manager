@@ -24,6 +24,10 @@ GraphManager::GraphManager(
       std::to_string(config.verbose));
   logger.logInfo("GraphManager - Robot map frame set to: " + config.map_frame);
 
+  if (config.approximate_ts_lookup) {
+    logger.logWarn("GraphManager - Using approximate TS lookup.");
+  }
+
   odom_noise_ = Eigen::Map<const Eigen::Matrix<double, 6, 1>>(
       config.odom_noise_std.data());
   relative_noise_ = Eigen::Map<const Eigen::Matrix<double, 6, 1>>(
@@ -159,10 +163,13 @@ void GraphManager::processAnchorConstraints(nav_msgs::msg::Path const& path) {
 
       // Find corresponding key in graph
       gtsam::Key key;
-      auto key_itr = timestamp_key_map_.find(ts);
-      if (key_itr != timestamp_key_map_.end()) {
-        key = key_itr->second;  // Save Key
+      bool found = false;
+      if (config_.approximate_ts_lookup) {
+        found = findClosestKeyForTs(ts, &key);
       } else {
+        found = findExactKeyForTs(ts, &key);
+      }
+      if (!found) {
         if (config_.verbose)
           logger.logInfo(
               "\033[36mANCHOR\033[0m - Found no closest key for ts: " +
@@ -254,78 +261,88 @@ void GraphManager::processRelativeConstraints(nav_msgs::msg::Path const& path) {
       path.header.stamp.sec * 1e9 + path.header.stamp.nanosec;
   {
     std::lock_guard<std::mutex> lock(graph_mutex_);
-    auto parent_itr = timestamp_key_map_.find(parent_ts);
-    if (parent_itr != timestamp_key_map_.end()) {
-      gtsam::Key parent_key = parent_itr->second;
-      // Loop through relative(parent)-relative(child) constraints
-      auto t1 = std::chrono::high_resolution_clock::now();
-      const std::size_t n_poses = path.poses.size();
-      for (size_t i = 0; i < n_poses; ++i) {
-        const auto child_ts = path.poses[i].header.stamp.sec * 1e9 +
-                              path.poses[i].header.stamp.nanosec;
-
-        // Check if child is associated to a key
-        auto child_itr = timestamp_key_map_.find(child_ts);
-        if (child_itr != timestamp_key_map_.end()) {
-          gtsam::Key child_key = child_itr->second;
-          // std::cout << std::fixed << ", Child Key : " << child_key << ", ts:
-          // " << child_ts << std::endl;
-
-          // Skip if keys are same
-          if (child_key == parent_key) {
-            if (config_.verbose > 0)
-              logger.logInfo(
-                  "GraphManager - Same relaitve parent/child keys, key:" +
-                  std::to_string(child_key));
-            continue;
-          }
-
-          // Check if a previous BetweenFactor exists between two keys
-          gtsam::FactorIndices remove_factor_idx;
-          int rmIdx = findRelativeFactorIdx(parent_key, child_key, true);
-          if (rmIdx != -1)
-            remove_factor_idx.emplace_back(rmIdx);
-
-          // Add relative-relative BetweenFactor
-          static auto relativeNoise =
-              gtsam::noiseModel::Diagonal::Sigmas(relative_noise_);
-          const auto& p = path.poses[i].pose;
-          gtsam::Pose3 T_B1B2(
-              gtsam::Rot3(
-                  p.orientation.w, p.orientation.x, p.orientation.y,
-                  p.orientation.z),
-              gtsam::Point3(p.position.x, p.position.y, p.position.z));
-          gtsam::BetweenFactor<gtsam::Pose3> relativeBF(
-              X(parent_key), X(child_key), T_B1B2, relativeNoise);
-          new_factors_.add(relativeBF);
-          // Update Graph
-          graph_->update(new_factors_, gtsam::Values(), remove_factor_idx);
-          new_factors_.resize(0);
-          incFactorCount();
-          updateKeyRelativeFactorIdxMap(parent_key, child_key);
-          if (config_.verbose > 3)
-            logger.logInfo(
-                "\033[34mRELATIVE\033[0m - : P(" + std::to_string(parent_key) +
-                ")-C(" + std::to_string(child_key) + ")");
-        } else
-          continue;
-      }
-      auto t2 = std::chrono::high_resolution_clock::now();
-
-      if (config_.verbose > 1)
-        logger.logInfo(
-            "\033[34mRELATIVE-UPDATE\033[0m - Constraints added: " +
-            std::to_string(n_poses) + ", time(ms): " +
-            std::to_string(
-                std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1)
-                    .count()));
+    gtsam::Key parent_key;
+    bool found = false;
+    if (config_.approximate_ts_lookup) {
+      found = findClosestKeyForTs(parent_ts, &parent_key);
     } else {
+      found = findExactKeyForTs(parent_ts, &parent_key);
+    }
+    if (!found) {
       if (config_.verbose > 2)
         logger.logInfo(
             "\033[34mRELATIVE\033[0m  - Found no key for parent at ts: " +
             std::to_string(parent_ts) + " --- SKIPPING CHILDERN ---");
       return;
     }
+
+    // Loop through relative(parent)-relative(child) constraints
+    auto t1 = std::chrono::high_resolution_clock::now();
+    const std::size_t n_poses = path.poses.size();
+    gtsam::Key child_key;
+    for (size_t i = 0u; i < n_poses; ++i) {
+      const auto child_ts = path.poses[i].header.stamp.sec * 1e9 +
+                            path.poses[i].header.stamp.nanosec;
+
+      // Check if child is associated to a key
+      if (config_.approximate_ts_lookup) {
+        found = findClosestKeyForTs(child_ts, &child_key);
+      } else {
+        found = findExactKeyForTs(child_ts, &child_key);
+      }
+      if (!found) {
+        logger.logInfo(
+            "\033[34mRELATIVE\033[0m - : Child is not associated with a "
+            "key!");
+        continue;
+      }
+
+      // Skip if keys are same
+      if (child_key == parent_key) {
+        if (config_.verbose > 0)
+          logger.logInfo(
+              "GraphManager - Same relaitve parent/child keys, key:" +
+              std::to_string(child_key));
+        continue;
+      }
+
+      // Check if a previous BetweenFactor exists between two keys
+      gtsam::FactorIndices remove_factor_idx;
+      int rmIdx = findRelativeFactorIdx(parent_key, child_key, true);
+      if (rmIdx != -1)
+        remove_factor_idx.emplace_back(rmIdx);
+
+      // Add relative-relative BetweenFactor
+      static auto relativeNoise =
+          gtsam::noiseModel::Diagonal::Sigmas(relative_noise_);
+      const auto& p = path.poses[i].pose;
+      gtsam::Pose3 T_B1B2(
+          gtsam::Rot3(
+              p.orientation.w, p.orientation.x, p.orientation.y,
+              p.orientation.z),
+          gtsam::Point3(p.position.x, p.position.y, p.position.z));
+      gtsam::BetweenFactor<gtsam::Pose3> relativeBF(
+          X(parent_key), X(child_key), T_B1B2, relativeNoise);
+      new_factors_.add(relativeBF);
+      // Update Graph
+      graph_->update(new_factors_, gtsam::Values(), remove_factor_idx);
+      new_factors_.resize(0);
+      incFactorCount();
+      updateKeyRelativeFactorIdxMap(parent_key, child_key);
+      if (config_.verbose > 3)
+        logger.logInfo(
+            "\033[34mRELATIVE\033[0m - : P(" + std::to_string(parent_key) +
+            ")-C(" + std::to_string(child_key) + ")");
+    }
+    auto t2 = std::chrono::high_resolution_clock::now();
+
+    if (config_.verbose > 1)
+      logger.logInfo(
+          "\033[34mRELATIVE-UPDATE\033[0m - Constraints added: " +
+          std::to_string(n_poses) + ", time(ms): " +
+          std::to_string(
+              std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1)
+                  .count()));
   }
 }
 
@@ -444,6 +461,41 @@ auto GraphManager::findRelativeFactorIdx(
   }
 
   return output;
+}
+
+auto GraphManager::findExactKeyForTs(double ts, gtsam::Key* key) const -> bool {
+  if (key == nullptr || timestamp_key_map_.empty()) {
+    return false;
+  }
+  auto it = timestamp_key_map_.find(ts);
+  if (it == timestamp_key_map_.cend()) {
+    return false;
+  }
+  *key = it->second;
+  return true;
+}
+
+auto GraphManager::findClosestKeyForTs(double ts, gtsam::Key* key) const
+    -> bool {
+  if (key == nullptr || timestamp_key_map_.empty()) {
+    return false;
+  }
+  auto comp = [](const std::pair<double, gtsam::Key>& lhs, const double ts) {
+    return lhs.first < ts;
+  };
+  auto& logger = GraphManagerLogger::getInstance();
+  auto it = std::lower_bound(
+      timestamp_key_map_.cbegin(), timestamp_key_map_.cend(), ts, comp);
+  if (it == timestamp_key_map_.cend()) {
+    logger.logError(
+        "GraphManager - No key found for timestamp: " + std::to_string(ts));
+    return false;
+  }
+
+  *key = it->second;
+  double const& eps = config_.ts_lookup_threshold * 1e9;
+  auto ts_diff = std::abs(ts - it->first);
+  return ts_diff < eps;
 }
 
 }  // namespace fgsp
