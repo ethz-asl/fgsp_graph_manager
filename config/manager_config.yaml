@@ -10,7 +10,7 @@ graph_manager:
 
     update_interval_ms: 5000 # Interval(ms) at which graph is optimized
     approximate_ts_lookup: true
-    ts_lookup_threshold: 0.1
+    ts_lookup_threshold: 0.01
     odom_topic: "/odometry"
 
     T_O_B:

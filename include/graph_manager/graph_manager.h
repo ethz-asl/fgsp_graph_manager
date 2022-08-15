@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <map>
 #include <mutex>
 #include <unordered_map>
 #include <vector>
@@ -83,7 +84,7 @@ class GraphManager {
   gtsam::Pose3 last_Base_pose_;
 
   // Lookup map objects for key-to-factorIndex associations
-  std::unordered_map<double, gtsam::Key>
+  std::map<double, gtsam::Key>
       timestamp_key_map_;  // Timestamp-Key map for lookup of keys corresponding
                            // to odometry timestamps
   std::unordered_map<gtsam::Key, double>
