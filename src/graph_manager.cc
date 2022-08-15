@@ -480,9 +480,7 @@ auto GraphManager::findClosestKeyForTs(double ts, gtsam::Key* key) const
   if (key == nullptr || timestamp_key_map_.empty()) {
     return false;
   }
-  double const& eps = config_.ts_lookup_threshold * 1e9;
-  auto comp = [&eps](
-                  const std::pair<double, gtsam::Key>& lhs, const double ts) {
+  auto comp = [](const std::pair<double, gtsam::Key>& lhs, const double ts) {
     return lhs.first < ts;
   };
   auto& logger = GraphManagerLogger::getInstance();
@@ -494,21 +492,9 @@ auto GraphManager::findClosestKeyForTs(double ts, gtsam::Key* key) const
     return false;
   }
 
-  logger.logError(
-      "GraphManager - lookup ts is " + std::to_string(ts) + " closest ts is " +
-      std::to_string(it->first));
-
-  auto it_exact = timestamp_key_map_.find(ts);
-  if (it_exact != timestamp_key_map_.cend()) {
-    logger.logError(
-        "GraphManager - exact ts is " + std::to_string(it_exact->first));
-  }
-
-  auto ts_diff = std::abs(ts - it->first);
-  logger.logError(
-      "GraphManager - lookup ts diff is " + std::to_string(ts_diff));
-
   *key = it->second;
+  double const& eps = config_.ts_lookup_threshold * 1e9;
+  auto ts_diff = std::abs(ts - it->first);
   return ts_diff < eps;
 }
 
