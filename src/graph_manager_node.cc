@@ -45,7 +45,7 @@ GraphManagerNode::GraphManagerNode() : rclcpp::Node("graph_manager") {
   relative_sub_ = create_subscription<nav_msgs::msg::Path>(
       config_->relative_topic, qos,
       std::bind(
-          &fgsp::GraphManager::processRelativeConstraints, manager_.get(),
+          &fgsp::GraphManager::bufferRelativeConstraints, manager_.get(),
           std::placeholders::_1));
 
   timer_ = create_wall_timer(

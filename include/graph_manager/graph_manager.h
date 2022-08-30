@@ -27,8 +27,12 @@ class GraphManager {
       GraphManagerVisualizer& visualizer);
 
   void odometryCallback(nav_msgs::msg::Odometry const& odom);
+  void processConstraints();
   void processAnchorConstraints(nav_msgs::msg::Path const& path);
-  void processRelativeConstraints(nav_msgs::msg::Path const& path);
+  void processRelativeConstraints(
+      std::vector<nav_msgs::msg::Path> const& constraints);
+
+  void bufferRelativeConstraints(nav_msgs::msg::Path const& path);
 
   // Get state key
   auto stateKey() const -> gtsam::Key { return state_key_; }
@@ -109,6 +113,8 @@ class GraphManager {
   GraphManagerPublisher& publisher_;
   GraphManagerVisualizer& visualizer_;
   bool is_odom_degenerated_ = false;
+  std::mutex relative_constraints_mutex_;
+  std::vector<nav_msgs::msg::Path> relative_constraints_buffer_;
 };
 
 }  // namespace fgsp
