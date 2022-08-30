@@ -294,6 +294,7 @@ void GraphManager::processRelativeConstraints(
   auto t1 = std::chrono::high_resolution_clock::now();
   gtsam::FactorIndices remove_factor_idx;
   gtsam::NonlinearFactorGraph new_factors;
+  std::vector<std::pair<gtsam::Key, gtsam::Key>> new_edges;
   for (auto const& path : constraints) {
     // Find corresponding parent key in graph
     auto const parent_ts =
@@ -345,9 +346,6 @@ void GraphManager::processRelativeConstraints(
       // Check if a previous BetweenFactor exists between two keys
       int const rmIdx = findRelativeFactorIdx(parent_key, child_key, true);
       if (rmIdx != -1) {
-        std::cout << "-----------------------------------------------------"
-                     "----------------"
-                  << std::endl;
         remove_factor_idx.emplace_back(rmIdx);
       }
 
@@ -363,8 +361,6 @@ void GraphManager::processRelativeConstraints(
       gtsam::BetweenFactor<gtsam::Pose3> relativeBF(
           X(parent_key), X(child_key), T_B1B2, relativeNoise);
       new_factors.add(relativeBF);
-      incFactorCount();
-      updateKeyRelativeFactorIdxMap(parent_key, child_key);
       ++n_constraints;
 
       if (config_.verbose > 3)
@@ -378,6 +374,12 @@ void GraphManager::processRelativeConstraints(
   {
     std::lock_guard<std::mutex> lock(graph_mutex_);
     graph_->update(new_factors, gtsam::Values(), remove_factor_idx);
+
+    // bookkeeping
+    for (auto const& edge : new_edges) {
+      updateKeyRelativeFactorIdxMap(edge.first, edge.second);
+    }
+    incFactorCount(n_constraints);
   }
 
   auto t2 = std::chrono::high_resolution_clock::now();

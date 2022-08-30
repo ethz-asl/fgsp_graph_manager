@@ -66,7 +66,7 @@ class GraphManager {
   auto findClosestKeyForTs(const double ts, gtsam::Key* key) const -> bool;
 
   // Factor count increment and retreivel
-  void incFactorCount() { ++factor_count_; }
+  void incFactorCount(std::size_t incr = 1u) { factor_count_ += incr; }
   auto getFactorCount() -> std::size_t { return factor_count_; }
 
   gtsam::Pose3 T_O_B_;      // Base(B) to Odometry(O)
