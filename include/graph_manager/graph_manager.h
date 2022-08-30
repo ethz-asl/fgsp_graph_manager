@@ -27,14 +27,14 @@ class GraphManager {
       GraphManagerVisualizer& visualizer);
 
   void odometryCallback(nav_msgs::msg::Odometry const& odom);
+  void bufferAnchorConstraints(nav_msgs::msg::Path const& path);
+  void bufferRelativeConstraints(nav_msgs::msg::Path const& path);
+
   void processConstraints();
   void processAnchorConstraints(
       std::vector<nav_msgs::msg::Path> const& constraints);
   void processRelativeConstraints(
       std::vector<nav_msgs::msg::Path> const& constraints);
-
-  void bufferAnchorConstraints(nav_msgs::msg::Path const& path);
-  void bufferRelativeConstraints(nav_msgs::msg::Path const& path);
 
   // Get state key
   auto stateKey() const -> gtsam::Key { return state_key_; }
