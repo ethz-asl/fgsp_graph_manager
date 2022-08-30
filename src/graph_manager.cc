@@ -137,7 +137,8 @@ void GraphManager::odometryCallback(nav_msgs::msg::Odometry const& odom) {
   }
 }
 
-void GraphManager::processAnchorConstraints(nav_msgs::msg::Path const& path) {
+void GraphManager::processAnchorConstraints(
+    std::vector<nav_msgs::msg::Path> const& constraints) {
   auto const& logger = GraphManagerLogger::getInstance();
   if (graph_ == nullptr) {
     const auto& logger = GraphManagerLogger::getInstance();
@@ -152,9 +153,9 @@ void GraphManager::processAnchorConstraints(nav_msgs::msg::Path const& path) {
   }
 
   // Loop through all pose updates and add prior factor on graph nodes
-  {
+  auto t1 = std::chrono::high_resolution_clock::now();
+  for (auto const& path : constraints) {
     std::lock_guard<std::mutex> lock(graph_mutex_);
-    auto t1 = std::chrono::high_resolution_clock::now();
     gtsam::FactorIndices remove_factor_idx;
     for (const geometry_msgs::msg::PoseStamped& pose_msg : path.poses) {
       // Update timestamp
@@ -232,24 +233,41 @@ void GraphManager::processAnchorConstraints(nav_msgs::msg::Path const& path) {
       // Associate Anchor pose to key
       updateKeyAnchorPoseMap(key, T_M_B);
     }
-    auto t2 = std::chrono::high_resolution_clock::now();
-    if (config_.verbose)
-      logger.logInfo(
-          "\033[36mANCHOR-UPDATE\033[0m - time(ms): " +
-          std::to_string(
-              std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1)
-                  .count()));
   }
+  auto t2 = std::chrono::high_resolution_clock::now();
+  if (config_.verbose)
+    logger.logInfo(
+        "\033[36mANCHOR-UPDATE\033[0m - time(ms): " +
+        std::to_string(
+            std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1)
+                .count()));
 }
 
 void GraphManager::processConstraints() {
-  std::vector<nav_msgs::msg::Path> constraints;
-  {
-    const std::lock_guard<std::mutex> lock(relative_constraints_mutex_);
-    constraints = relative_constraints_buffer_;
-    relative_constraints_buffer_.clear();
+  if (!anchor_constraints_buffer_.empty()) {
+    std::vector<nav_msgs::msg::Path> anchor_constraints;
+    {
+      const std::lock_guard<std::mutex> lock(anchor_constraints_mutex_);
+      anchor_constraints = anchor_constraints_buffer_;
+      anchor_constraints_buffer_.clear();
+    }
+    processAnchorConstraints(anchor_constraints);
   }
-  processRelativeConstraints(constraints);
+
+  if (!relative_constraints_buffer_.empty()) {
+    std::vector<nav_msgs::msg::Path> relative_constraints;
+    {
+      const std::lock_guard<std::mutex> lock(relative_constraints_mutex_);
+      relative_constraints = relative_constraints_buffer_;
+      relative_constraints_buffer_.clear();
+    }
+    processRelativeConstraints(relative_constraints);
+  }
+}
+
+void GraphManager::bufferAnchorConstraints(nav_msgs::msg::Path const& path) {
+  const std::lock_guard<std::mutex> lock(anchor_constraints_mutex_);
+  anchor_constraints_buffer_.emplace_back(path);
 }
 
 void GraphManager::bufferRelativeConstraints(nav_msgs::msg::Path const& path) {
@@ -347,22 +365,23 @@ void GraphManager::processRelativeConstraints(
         new_factors_.resize(0);
         incFactorCount();
         updateKeyRelativeFactorIdxMap(parent_key, child_key);
+        ++n_constraints;
+
         if (config_.verbose > 3)
           logger.logInfo(
               "\033[34mRELATIVE\033[0m - : P(" + std::to_string(parent_key) +
               ")-C(" + std::to_string(child_key) + ")");
       }
     }
-    auto t2 = std::chrono::high_resolution_clock::now();
-
-    if (config_.verbose > 1)
-      logger.logInfo(
-          "\033[34mRELATIVE-UPDATE\033[0m - Constraints added: " +
-          std::to_string(n_constraints) + ", time(ms): " +
-          std::to_string(
-              std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1)
-                  .count()));
   }
+  auto t2 = std::chrono::high_resolution_clock::now();
+  if (config_.verbose > 1)
+    logger.logInfo(
+        "\033[34mRELATIVE-UPDATE\033[0m - Constraints added: " +
+        std::to_string(n_constraints) + ", time(ms): " +
+        std::to_string(
+            std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1)
+                .count()));
 }
 
 void GraphManager::addPriorFactor(
@@ -421,6 +440,9 @@ void GraphManager::updateGraphResults() {
   // Check if graph has initialized
   if (first_odom_msg_)
     return;
+
+  // Process the latest constraints
+  processConstraints();
 
   // Update results
   gtsam::Values result;

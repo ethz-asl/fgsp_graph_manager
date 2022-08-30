@@ -28,10 +28,12 @@ class GraphManager {
 
   void odometryCallback(nav_msgs::msg::Odometry const& odom);
   void processConstraints();
-  void processAnchorConstraints(nav_msgs::msg::Path const& path);
+  void processAnchorConstraints(
+      std::vector<nav_msgs::msg::Path> const& constraints);
   void processRelativeConstraints(
       std::vector<nav_msgs::msg::Path> const& constraints);
 
+  void bufferAnchorConstraints(nav_msgs::msg::Path const& path);
   void bufferRelativeConstraints(nav_msgs::msg::Path const& path);
 
   // Get state key
@@ -113,7 +115,10 @@ class GraphManager {
   GraphManagerPublisher& publisher_;
   GraphManagerVisualizer& visualizer_;
   bool is_odom_degenerated_ = false;
+
+  std::mutex anchor_constraints_mutex_;
   std::mutex relative_constraints_mutex_;
+  std::vector<nav_msgs::msg::Path> anchor_constraints_buffer_;
   std::vector<nav_msgs::msg::Path> relative_constraints_buffer_;
 };
 
