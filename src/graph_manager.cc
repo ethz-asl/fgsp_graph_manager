@@ -361,6 +361,7 @@ void GraphManager::processRelativeConstraints(
       gtsam::BetweenFactor<gtsam::Pose3> relativeBF(
           X(parent_key), X(child_key), T_B1B2, relativeNoise);
       new_factors.add(relativeBF);
+      new_edges.emplace_back(std::make_pair(parent_key, child_key));
       ++n_constraints;
 
       if (config_.verbose > 3)
