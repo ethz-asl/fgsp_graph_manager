@@ -297,7 +297,6 @@ void GraphManager::processRelativeConstraints(
     // Find corresponding parent key in graph
     auto const parent_ts =
         path.header.stamp.sec * 1e9 + path.header.stamp.nanosec;
-    std::lock_guard<std::mutex> lock(graph_mutex_);
     gtsam::Key parent_key;
     bool found = false;
     if (config_.approximate_ts_lookup) {
@@ -360,12 +359,15 @@ void GraphManager::processRelativeConstraints(
           X(parent_key), X(child_key), T_B1B2, relativeNoise);
 
       // Update Graph
-      new_factors_.add(relativeBF);
-      graph_->update(new_factors_, gtsam::Values(), remove_factor_idx);
-      new_factors_.resize(0);
-      incFactorCount();
-      updateKeyRelativeFactorIdxMap(parent_key, child_key);
-      ++n_constraints;
+      {
+        std::lock_guard<std::mutex> lock(graph_mutex_);
+        new_factors_.add(relativeBF);
+        graph_->update(new_factors_, gtsam::Values(), remove_factor_idx);
+        new_factors_.resize(0);
+        incFactorCount();
+        updateKeyRelativeFactorIdxMap(parent_key, child_key);
+        ++n_constraints;
+      }
 
       if (config_.verbose > 3)
         logger.logInfo(
@@ -483,7 +485,7 @@ auto GraphManager::findRelativeFactorIdx(
   // should have same factor index at two graph keys(nodes)
   std::set<std::size_t> result;
   std::set_intersection(
-      p_set.begin(), p_set.end(), c_set.begin(), c_set.end(),
+      p_set.cbegin(), p_set.cend(), c_set.cbegin(), c_set.cend(),
       std::inserter(result, result.begin()));
 
   // Check if success
