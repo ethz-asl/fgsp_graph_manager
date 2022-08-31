@@ -292,13 +292,12 @@ void GraphManager::processRelativeConstraints(
 
   std::size_t n_constraints = 0u;
   auto t1 = std::chrono::high_resolution_clock::now();
-  gtsam::FactorIndices remove_factor_idx;
-  gtsam::NonlinearFactorGraph new_factors;
-  std::vector<std::pair<gtsam::Key, gtsam::Key>> new_edges;
+
   for (auto const& path : constraints) {
     // Find corresponding parent key in graph
     auto const parent_ts =
         path.header.stamp.sec * 1e9 + path.header.stamp.nanosec;
+    std::lock_guard<std::mutex> lock(graph_mutex_);
     gtsam::Key parent_key;
     bool found = false;
     if (config_.approximate_ts_lookup) {
@@ -313,14 +312,12 @@ void GraphManager::processRelativeConstraints(
             std::to_string(parent_ts) + " --- SKIPPING CHILDERN ---");
       return;
     }
-
     // Loop through relative(parent)-relative(child) constraints
     std::size_t const n_poses = path.poses.size();
     gtsam::Key child_key;
     for (size_t i = 0u; i < n_poses; ++i) {
       auto const child_ts = path.poses[i].header.stamp.sec * 1e9 +
                             path.poses[i].header.stamp.nanosec;
-
       // Check if child is associated to a key
       if (config_.approximate_ts_lookup) {
         found = findClosestKeyForTs(child_ts, &child_key);
@@ -333,7 +330,6 @@ void GraphManager::processRelativeConstraints(
             "key!");
         continue;
       }
-
       // Skip if keys are same
       if (child_key == parent_key) {
         if (config_.verbose > 0)
@@ -342,13 +338,11 @@ void GraphManager::processRelativeConstraints(
               std::to_string(child_key));
         continue;
       }
-
       // Check if a previous BetweenFactor exists between two keys
+      gtsam::FactorIndices remove_factor_idx;
       int const rmIdx = findRelativeFactorIdx(parent_key, child_key, true);
-      if (rmIdx != -1) {
+      if (rmIdx != -1)
         remove_factor_idx.emplace_back(rmIdx);
-      }
-
       // Add relative-relative BetweenFactor
       static auto relativeNoise =
           gtsam::noiseModel::Diagonal::Sigmas(relative_noise_);
@@ -360,8 +354,12 @@ void GraphManager::processRelativeConstraints(
           gtsam::Point3(p.position.x, p.position.y, p.position.z));
       gtsam::BetweenFactor<gtsam::Pose3> relativeBF(
           X(parent_key), X(child_key), T_B1B2, relativeNoise);
-      new_factors.add(relativeBF);
-      new_edges.emplace_back(std::make_pair(parent_key, child_key));
+      new_factors_.add(relativeBF);
+      // Update Graph
+      graph_->update(new_factors_, gtsam::Values(), remove_factor_idx);
+      new_factors_.resize(0);
+      incFactorCount();
+      updateKeyRelativeFactorIdxMap(parent_key, child_key);
       ++n_constraints;
 
       if (config_.verbose > 3)
@@ -371,18 +369,7 @@ void GraphManager::processRelativeConstraints(
     }
   }
 
-  // Update graph
-  {
-    std::lock_guard<std::mutex> lock(graph_mutex_);
-    graph_->update(new_factors, gtsam::Values(), remove_factor_idx);
-
-    // bookkeeping
-    for (auto const& edge : new_edges) {
-      updateKeyRelativeFactorIdxMap(edge.first, edge.second);
-    }
-    incFactorCount(n_constraints);
-  }
-
+  // incFactorCount(n_constraints);
   auto t2 = std::chrono::high_resolution_clock::now();
   if (config_.verbose > 1)
     logger.logInfo(
