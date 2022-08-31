@@ -137,7 +137,40 @@ void GraphManager::odometryCallback(nav_msgs::msg::Odometry const& odom) {
   }
 }
 
-void GraphManager::processAnchorConstraints(nav_msgs::msg::Path const& path) {
+void GraphManager::bufferAnchorConstraints(nav_msgs::msg::Path const& path) {
+  const std::lock_guard<std::mutex> lock(anchor_constraints_mutex_);
+  anchor_constraints_buffer_.emplace_back(path);
+}
+
+void GraphManager::bufferRelativeConstraints(nav_msgs::msg::Path const& path) {
+  const std::lock_guard<std::mutex> lock(relative_constraints_mutex_);
+  relative_constraints_buffer_.emplace_back(path);
+}
+
+void GraphManager::processConstraints() {
+  if (!anchor_constraints_buffer_.empty()) {
+    std::vector<nav_msgs::msg::Path> anchor_constraints;
+    {
+      const std::lock_guard<std::mutex> lock(anchor_constraints_mutex_);
+      anchor_constraints = anchor_constraints_buffer_;
+      anchor_constraints_buffer_.clear();
+    }
+    processAnchorConstraints(anchor_constraints);
+  }
+
+  if (!relative_constraints_buffer_.empty()) {
+    std::vector<nav_msgs::msg::Path> relative_constraints;
+    {
+      const std::lock_guard<std::mutex> lock(relative_constraints_mutex_);
+      relative_constraints = relative_constraints_buffer_;
+      relative_constraints_buffer_.clear();
+    }
+    processRelativeConstraints(relative_constraints);
+  }
+}
+
+void GraphManager::processAnchorConstraints(
+    std::vector<nav_msgs::msg::Path> const& constraints) {
   auto const& logger = GraphManagerLogger::getInstance();
   if (graph_ == nullptr) {
     const auto& logger = GraphManagerLogger::getInstance();
@@ -152,9 +185,9 @@ void GraphManager::processAnchorConstraints(nav_msgs::msg::Path const& path) {
   }
 
   // Loop through all pose updates and add prior factor on graph nodes
-  {
+  auto t1 = std::chrono::high_resolution_clock::now();
+  for (auto const& path : constraints) {
     std::lock_guard<std::mutex> lock(graph_mutex_);
-    auto t1 = std::chrono::high_resolution_clock::now();
     gtsam::FactorIndices remove_factor_idx;
     for (const geometry_msgs::msg::PoseStamped& pose_msg : path.poses) {
       // Update timestamp
@@ -232,17 +265,18 @@ void GraphManager::processAnchorConstraints(nav_msgs::msg::Path const& path) {
       // Associate Anchor pose to key
       updateKeyAnchorPoseMap(key, T_M_B);
     }
-    auto t2 = std::chrono::high_resolution_clock::now();
-    if (config_.verbose)
-      logger.logInfo(
-          "\033[36mANCHOR-UPDATE\033[0m - time(ms): " +
-          std::to_string(
-              std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1)
-                  .count()));
   }
+  auto t2 = std::chrono::high_resolution_clock::now();
+  if (config_.verbose)
+    logger.logInfo(
+        "\033[36mANCHOR-UPDATE\033[0m - time(ms): " +
+        std::to_string(
+            std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1)
+                .count()));
 }
 
-void GraphManager::processRelativeConstraints(nav_msgs::msg::Path const& path) {
+void GraphManager::processRelativeConstraints(
+    std::vector<nav_msgs::msg::Path> const& constraints) {
   auto const& logger = GraphManagerLogger::getInstance();
   if (graph_ == nullptr) {
     const auto& logger = GraphManagerLogger::getInstance();
@@ -256,11 +290,13 @@ void GraphManager::processRelativeConstraints(nav_msgs::msg::Path const& path) {
     return;
   }
 
-  // Find corresponding parent key in graph
-  const auto parent_ts =
-      path.header.stamp.sec * 1e9 + path.header.stamp.nanosec;
-  {
-    std::lock_guard<std::mutex> lock(graph_mutex_);
+  std::size_t n_constraints = 0u;
+  auto t1 = std::chrono::high_resolution_clock::now();
+
+  for (auto const& path : constraints) {
+    // Find corresponding parent key in graph
+    auto const parent_ts =
+        path.header.stamp.sec * 1e9 + path.header.stamp.nanosec;
     gtsam::Key parent_key;
     bool found = false;
     if (config_.approximate_ts_lookup) {
@@ -277,13 +313,11 @@ void GraphManager::processRelativeConstraints(nav_msgs::msg::Path const& path) {
     }
 
     // Loop through relative(parent)-relative(child) constraints
-    auto t1 = std::chrono::high_resolution_clock::now();
-    const std::size_t n_poses = path.poses.size();
+    std::size_t const n_poses = path.poses.size();
     gtsam::Key child_key;
     for (size_t i = 0u; i < n_poses; ++i) {
-      const auto child_ts = path.poses[i].header.stamp.sec * 1e9 +
+      auto const child_ts = path.poses[i].header.stamp.sec * 1e9 +
                             path.poses[i].header.stamp.nanosec;
-
       // Check if child is associated to a key
       if (config_.approximate_ts_lookup) {
         found = findClosestKeyForTs(child_ts, &child_key);
@@ -308,7 +342,7 @@ void GraphManager::processRelativeConstraints(nav_msgs::msg::Path const& path) {
 
       // Check if a previous BetweenFactor exists between two keys
       gtsam::FactorIndices remove_factor_idx;
-      int rmIdx = findRelativeFactorIdx(parent_key, child_key, true);
+      int const rmIdx = findRelativeFactorIdx(parent_key, child_key, true);
       if (rmIdx != -1)
         remove_factor_idx.emplace_back(rmIdx);
 
@@ -323,27 +357,34 @@ void GraphManager::processRelativeConstraints(nav_msgs::msg::Path const& path) {
           gtsam::Point3(p.position.x, p.position.y, p.position.z));
       gtsam::BetweenFactor<gtsam::Pose3> relativeBF(
           X(parent_key), X(child_key), T_B1B2, relativeNoise);
-      new_factors_.add(relativeBF);
+
       // Update Graph
-      graph_->update(new_factors_, gtsam::Values(), remove_factor_idx);
-      new_factors_.resize(0);
-      incFactorCount();
-      updateKeyRelativeFactorIdxMap(parent_key, child_key);
+      {
+        std::lock_guard<std::mutex> lock(graph_mutex_);
+        new_factors_.add(relativeBF);
+        graph_->update(new_factors_, gtsam::Values(), remove_factor_idx);
+        new_factors_.resize(0);
+        incFactorCount();
+        updateKeyRelativeFactorIdxMap(parent_key, child_key);
+        ++n_constraints;
+      }
+
       if (config_.verbose > 3)
         logger.logInfo(
             "\033[34mRELATIVE\033[0m - : P(" + std::to_string(parent_key) +
             ")-C(" + std::to_string(child_key) + ")");
     }
-    auto t2 = std::chrono::high_resolution_clock::now();
-
-    if (config_.verbose > 1)
-      logger.logInfo(
-          "\033[34mRELATIVE-UPDATE\033[0m - Constraints added: " +
-          std::to_string(n_poses) + ", time(ms): " +
-          std::to_string(
-              std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1)
-                  .count()));
   }
+
+  // incFactorCount(n_constraints);
+  auto t2 = std::chrono::high_resolution_clock::now();
+  if (config_.verbose > 1)
+    logger.logInfo(
+        "\033[34mRELATIVE-UPDATE\033[0m - Constraints added: " +
+        std::to_string(n_constraints) + ", time(ms): " +
+        std::to_string(
+            std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1)
+                .count()));
 }
 
 void GraphManager::addPriorFactor(
@@ -403,6 +444,9 @@ void GraphManager::updateGraphResults() {
   if (first_odom_msg_)
     return;
 
+  // Process the latest constraints
+  processConstraints();
+
   // Update results
   gtsam::Values result;
   std::unordered_map<gtsam::Key, double> keyTimestampMap;
@@ -441,7 +485,7 @@ auto GraphManager::findRelativeFactorIdx(
   // should have same factor index at two graph keys(nodes)
   std::set<std::size_t> result;
   std::set_intersection(
-      p_set.begin(), p_set.end(), c_set.begin(), c_set.end(),
+      p_set.cbegin(), p_set.cend(), c_set.cbegin(), c_set.cend(),
       std::inserter(result, result.begin()));
 
   // Check if success

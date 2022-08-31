@@ -27,8 +27,14 @@ class GraphManager {
       GraphManagerVisualizer& visualizer);
 
   void odometryCallback(nav_msgs::msg::Odometry const& odom);
-  void processAnchorConstraints(nav_msgs::msg::Path const& path);
-  void processRelativeConstraints(nav_msgs::msg::Path const& path);
+  void bufferAnchorConstraints(nav_msgs::msg::Path const& path);
+  void bufferRelativeConstraints(nav_msgs::msg::Path const& path);
+
+  void processConstraints();
+  void processAnchorConstraints(
+      std::vector<nav_msgs::msg::Path> const& constraints);
+  void processRelativeConstraints(
+      std::vector<nav_msgs::msg::Path> const& constraints);
 
   // Get state key
   auto stateKey() const -> gtsam::Key { return state_key_; }
@@ -60,7 +66,7 @@ class GraphManager {
   auto findClosestKeyForTs(const double ts, gtsam::Key* key) const -> bool;
 
   // Factor count increment and retreivel
-  void incFactorCount() { ++factor_count_; }
+  void incFactorCount(std::size_t incr = 1u) { factor_count_ += incr; }
   auto getFactorCount() -> std::size_t { return factor_count_; }
 
   gtsam::Pose3 T_O_B_;      // Base(B) to Odometry(O)
@@ -109,6 +115,11 @@ class GraphManager {
   GraphManagerPublisher& publisher_;
   GraphManagerVisualizer& visualizer_;
   bool is_odom_degenerated_ = false;
+
+  std::mutex anchor_constraints_mutex_;
+  std::mutex relative_constraints_mutex_;
+  std::vector<nav_msgs::msg::Path> anchor_constraints_buffer_;
+  std::vector<nav_msgs::msg::Path> relative_constraints_buffer_;
 };
 
 }  // namespace fgsp
