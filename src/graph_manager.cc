@@ -312,6 +312,7 @@ void GraphManager::processRelativeConstraints(
             std::to_string(parent_ts) + " --- SKIPPING CHILDERN ---");
       return;
     }
+
     // Loop through relative(parent)-relative(child) constraints
     std::size_t const n_poses = path.poses.size();
     gtsam::Key child_key;
@@ -330,6 +331,7 @@ void GraphManager::processRelativeConstraints(
             "key!");
         continue;
       }
+
       // Skip if keys are same
       if (child_key == parent_key) {
         if (config_.verbose > 0)
@@ -338,11 +340,13 @@ void GraphManager::processRelativeConstraints(
               std::to_string(child_key));
         continue;
       }
+
       // Check if a previous BetweenFactor exists between two keys
       gtsam::FactorIndices remove_factor_idx;
       int const rmIdx = findRelativeFactorIdx(parent_key, child_key, true);
       if (rmIdx != -1)
         remove_factor_idx.emplace_back(rmIdx);
+
       // Add relative-relative BetweenFactor
       static auto relativeNoise =
           gtsam::noiseModel::Diagonal::Sigmas(relative_noise_);
@@ -354,8 +358,9 @@ void GraphManager::processRelativeConstraints(
           gtsam::Point3(p.position.x, p.position.y, p.position.z));
       gtsam::BetweenFactor<gtsam::Pose3> relativeBF(
           X(parent_key), X(child_key), T_B1B2, relativeNoise);
-      new_factors_.add(relativeBF);
+
       // Update Graph
+      new_factors_.add(relativeBF);
       graph_->update(new_factors_, gtsam::Values(), remove_factor_idx);
       new_factors_.resize(0);
       incFactorCount();
