@@ -3,10 +3,16 @@
 #include <chrono>
 #include <sstream>
 
+#include <boost/foreach.hpp>
+
 #include <geometry_msgs/msg/pose_stamped.h>
+#include <gtsam/inference/FactorGraph.h>
 #include <gtsam/inference/Symbol.h>
+#include <gtsam/linear/JacobianFactor.h>
+#include <gtsam/nonlinear/ISAM2.h>
 #include <gtsam/slam/BetweenFactor.h>
 #include <gtsam/slam/PriorFactor.h>
+#include <stack>
 
 #include "graph_manager/graph_manager_logger.h"
 
@@ -434,9 +440,30 @@ void GraphManager::addPoseBetweenFactor(
   incFactorCount();
 }
 
+template <class CLIQUE>
+void nnz_internal(const boost::shared_ptr<CLIQUE>& clique, int& result) {
+  int dimR = (int)clique->conditional()->rows();
+  int dimSep = (int)clique->conditional()->S().cols();
+  result += ((dimR + 1) * dimR) / 2 + dimSep * dimR;
+  // traverse the children
+  BOOST_FOREACH (const typename CLIQUE::shared_ptr& child, clique->children) {
+    nnz_internal(child, result);
+  }
+}
+
+/* ************************************************************************* */
+template <class CLIQUE>
+int calculate_nnz(const boost::shared_ptr<CLIQUE>& clique) {
+  int result = 0;
+  // starting from the root, add up entries of frontal and conditional matrices
+  // of each conditional
+  nnz_internal(clique, result);
+  return result;
+}
+
 void GraphManager::updateGraphResults() {
+  auto const& logger = GraphManagerLogger::getInstance();
   if (graph_ == nullptr) {
-    const auto& logger = GraphManagerLogger::getInstance();
     logger.logError("GraphManager - Graph is nullptr, cannot update results.");
     return;
   }
@@ -450,11 +477,13 @@ void GraphManager::updateGraphResults() {
   // Update results
   gtsam::Values result;
   std::unordered_map<gtsam::Key, double> keyTimestampMap;
+  int nnz = 0;
   {
     std::lock_guard<std::mutex> lock(graph_mutex_);
     result = graph_->calculateBestEstimate();
     keyTimestampMap =
         key_timestamp_map_;  // copy cost 36000 elements(10Hz * 1Hr) ~10ms
+    nnz = calculate_nnz(graph_->roots().front());
   }
 
   // Visualize results
