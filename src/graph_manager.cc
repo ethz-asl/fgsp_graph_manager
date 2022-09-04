@@ -442,7 +442,7 @@ void GraphManager::addPoseBetweenFactor(
 
 template <class CLIQUE>
 void calculate_stats_rec(
-    const boost::shared_ptr<CLIQUE>& clique, std::size_t n, std::size_t& nnz) {
+    boost::shared_ptr<CLIQUE> const& clique, std::size_t& n, std::size_t& nnz) {
   std::size_t const dimR = clique->conditional()->rows();
   std::size_t const dimSep = clique->conditional()->S().cols();
   n += dimR * dimR + dimSep * dimSep;
@@ -455,9 +455,10 @@ void calculate_stats_rec(
 
 /* ************************************************************************* */
 template <class CLIQUE>
-auto calculate_stats(const boost::shared_ptr<CLIQUE>& clique) -> float {
+auto calculate_stats(boost::shared_ptr<CLIQUE> const& clique) -> float {
   std::size_t n = 0u, nnz = 0u;
   calculate_stats_rec(clique, n, nnz);
+  std::cout << "n: " << n << ", nnz: " << nnz << std::endl;
   return static_cast<float>(nnz) / static_cast<float>(n);
 }
 
