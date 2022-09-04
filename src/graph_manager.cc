@@ -440,26 +440,25 @@ void GraphManager::addPoseBetweenFactor(
   incFactorCount();
 }
 
-template <class CLIQUE>
-void calculate_stats_rec(
-    boost::shared_ptr<CLIQUE> const& clique, std::size_t& n, std::size_t& nnz) {
+void calculateStatsRec(
+    boost::shared_ptr<gtsam::ISAM2Clique> const& clique, std::size_t& n,
+    std::size_t& nnz) {
   std::size_t const dimR = clique->conditional()->rows();
   std::size_t const dimSep = clique->conditional()->S().cols();
   n += dimR * dimR + dimSep * dimSep;
   nnz += ((dimR + 1) * dimR) / 2 + dimSep * dimR;
 
   for (auto const& child : clique->children) {
-    calculate_stats_rec(child, n, nnz);
+    calculateStatsRec(child, n, nnz);
   }
 }
 
-/* ************************************************************************* */
-template <class CLIQUE>
-auto calculate_stats(boost::shared_ptr<CLIQUE> const& clique) -> float {
+void GraphManager::calculateStats(
+    boost::shared_ptr<gtsam::ISAM2Clique> const& clique) {
   std::size_t n = 0u, nnz = 0u;
-  calculate_stats_rec(clique, n, nnz);
-  std::cout << "n: " << n << ", nnz: " << nnz << std::endl;
-  return static_cast<float>(nnz) / static_cast<float>(n);
+  calculateStatsRec(clique, n, nnz);
+  n_components_.emplace_back(n);
+  nnz_components_.emplace_back(nnz);
 }
 
 void GraphManager::updateGraphResults() {
@@ -485,11 +484,18 @@ void GraphManager::updateGraphResults() {
     result = graph_->calculateBestEstimate();
     keyTimestampMap =
         key_timestamp_map_;  // copy cost 36000 elements(10Hz * 1Hr) ~10ms
-    sparsity = calculate_stats(graph_->roots().front());
+    calculateStats(graph_->roots().front());
   }
   auto t2 = std::chrono::high_resolution_clock::now();
 
   if (config_.verbose > 1) {
+    auto const n_sum =
+        std::accumulate(n_components_.begin(), n_components_.end(), 0u);
+    auto const n_avg = static_cast<float>(n_sum) / n_components_.size();
+
+    auto const nnz_sum =
+        std::accumulate(nnz_components_.begin(), nnz_components_.end(), 0u);
+    auto const nnz_avg = static_cast<float>(nnz_sum) / nnz_components_.size();
     logger.logInfo(
         "\033[36mGRAPH UPDATE\033[0m - time(ms):" +
         std::to_string(
@@ -497,11 +503,8 @@ void GraphManager::updateGraphResults() {
                 .count()));
     logger.logInfo(
         "\033[36mGRAPH UPDATE\033[0m - factors: " +
-        std::to_string(factor_count_) +
-        " sparsity: " + std::to_string(sparsity));
-    // graph_->print("GraphManager - Graph");
-    // logger.logWarn("-----------");
-    // graph_->printStats();
+        std::to_string(factor_count_) + " n_comps: " + std::to_string(n_avg) +
+        " nnz_comps: " + std::to_string(nnz_avg));
   }
 
   // Visualize results
