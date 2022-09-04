@@ -441,24 +441,24 @@ void GraphManager::addPoseBetweenFactor(
 }
 
 template <class CLIQUE>
-void nnz_internal(const boost::shared_ptr<CLIQUE>& clique, int& result) {
-  int dimR = (int)clique->conditional()->rows();
-  int dimSep = (int)clique->conditional()->S().cols();
-  result += ((dimR + 1) * dimR) / 2 + dimSep * dimR;
-  // traverse the children
-  BOOST_FOREACH (const typename CLIQUE::shared_ptr& child, clique->children) {
-    nnz_internal(child, result);
+void calculate_stats_rec(
+    const boost::shared_ptr<CLIQUE>& clique, std::size_t n, std::size_t& nnz) {
+  std::size_t const dimR = clique->conditional()->rows();
+  std::size_t const dimSep = clique->conditional()->S().cols();
+  n += dimR * dimR + dimSep * dimSep;
+  nnz += ((dimR + 1) * dimR) / 2 + dimSep * dimR;
+
+  for (auto const& child : clique->children) {
+    calculate_stats_rec(child, n, nnz);
   }
 }
 
 /* ************************************************************************* */
 template <class CLIQUE>
-int calculate_nnz(const boost::shared_ptr<CLIQUE>& clique) {
-  int result = 0;
-  // starting from the root, add up entries of frontal and conditional matrices
-  // of each conditional
-  nnz_internal(clique, result);
-  return result;
+auto calculate_stats(const boost::shared_ptr<CLIQUE>& clique) -> float {
+  std::size_t n = 0u, nnz = 0u;
+  calculate_stats_rec(clique, n, nnz);
+  return static_cast<float>(nnz) / static_cast<float>(n);
 }
 
 void GraphManager::updateGraphResults() {
@@ -477,13 +477,30 @@ void GraphManager::updateGraphResults() {
   // Update results
   gtsam::Values result;
   std::unordered_map<gtsam::Key, double> keyTimestampMap;
-  int nnz = 0;
+  float sparsity = 0.0f;
+  auto t1 = std::chrono::high_resolution_clock::now();
   {
     std::lock_guard<std::mutex> lock(graph_mutex_);
     result = graph_->calculateBestEstimate();
     keyTimestampMap =
         key_timestamp_map_;  // copy cost 36000 elements(10Hz * 1Hr) ~10ms
-    nnz = calculate_nnz(graph_->roots().front());
+    sparsity = calculate_stats(graph_->roots().front());
+  }
+  auto t2 = std::chrono::high_resolution_clock::now();
+
+  if (config_.verbose > 1) {
+    logger.logInfo(
+        "\033[36mGRAPH UPDATE\033[0m - time(ms):" +
+        std::to_string(
+            std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1)
+                .count()));
+    logger.logInfo(
+        "\033[36mGRAPH UPDATE\033[0m - factors: " +
+        std::to_string(factor_count_) +
+        " sparsity: " + std::to_string(sparsity));
+    // graph_->print("GraphManager - Graph");
+    // logger.logWarn("-----------");
+    // graph_->printStats();
   }
 
   // Visualize results
