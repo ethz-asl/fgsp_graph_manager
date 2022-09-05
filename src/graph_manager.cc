@@ -488,6 +488,15 @@ void GraphManager::updateGraphResults() {
   auto t2 = std::chrono::high_resolution_clock::now();
 
   if (config_.verbose > 1) {
+    auto const n_sum =
+        std::accumulate(n_components_.begin(), n_components_.end(), 0u);
+    auto const n_avg = static_cast<std::size_t>(
+        static_cast<float>(n_sum) / n_components_.size());
+    auto const nnz_sum =
+        std::accumulate(nnz_components_.begin(), nnz_components_.end(), 0u);
+    auto const nnz_avg = static_cast<std::size_t>(
+        static_cast<float>(nnz_sum) / nnz_components_.size());
+
     logger.logInfo(
         "\033[36mGRAPH UPDATE\033[0m - time(ms):" +
         std::to_string(
@@ -498,6 +507,10 @@ void GraphManager::updateGraphResults() {
         std::to_string(factor_count_) +
         " n_comps: " + std::to_string(n_components_.back()) +
         " nnz_comps: " + std::to_string(nnz_components_.back()));
+    logger.logInfo(
+        "\033[36mGRAPH UPDATE\033[0m - Average:  n_comps: " +
+        std::to_string(n_avg) +
+        " Average nnz_comps: " + std::to_string(nnz_avg));
   }
 
   // Visualize results
