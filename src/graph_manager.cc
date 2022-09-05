@@ -477,7 +477,6 @@ void GraphManager::updateGraphResults() {
   // Update results
   gtsam::Values result;
   std::unordered_map<gtsam::Key, double> keyTimestampMap;
-  float sparsity = 0.0f;
   auto t1 = std::chrono::high_resolution_clock::now();
   {
     std::lock_guard<std::mutex> lock(graph_mutex_);
@@ -489,13 +488,6 @@ void GraphManager::updateGraphResults() {
   auto t2 = std::chrono::high_resolution_clock::now();
 
   if (config_.verbose > 1) {
-    auto const n_sum =
-        std::accumulate(n_components_.begin(), n_components_.end(), 0u);
-    auto const n_avg = static_cast<float>(n_sum) / n_components_.size();
-
-    auto const nnz_sum =
-        std::accumulate(nnz_components_.begin(), nnz_components_.end(), 0u);
-    auto const nnz_avg = static_cast<float>(nnz_sum) / nnz_components_.size();
     logger.logInfo(
         "\033[36mGRAPH UPDATE\033[0m - time(ms):" +
         std::to_string(
@@ -503,8 +495,9 @@ void GraphManager::updateGraphResults() {
                 .count()));
     logger.logInfo(
         "\033[36mGRAPH UPDATE\033[0m - factors: " +
-        std::to_string(factor_count_) + " n_comps: " + std::to_string(n_avg) +
-        " nnz_comps: " + std::to_string(nnz_avg));
+        std::to_string(factor_count_) +
+        " n_comps: " + std::to_string(n_components_.back()) +
+        " nnz_comps: " + std::to_string(nnz_components_.back()));
   }
 
   // Visualize results
