@@ -3,10 +3,16 @@
 #include <chrono>
 #include <sstream>
 
+#include <boost/foreach.hpp>
+
 #include <geometry_msgs/msg/pose_stamped.h>
+#include <gtsam/inference/FactorGraph.h>
 #include <gtsam/inference/Symbol.h>
+#include <gtsam/linear/JacobianFactor.h>
+#include <gtsam/nonlinear/ISAM2.h>
 #include <gtsam/slam/BetweenFactor.h>
 #include <gtsam/slam/PriorFactor.h>
+#include <stack>
 
 #include "graph_manager/graph_manager_logger.h"
 
@@ -434,9 +440,30 @@ void GraphManager::addPoseBetweenFactor(
   incFactorCount();
 }
 
+void calculateStatsRec(
+    boost::shared_ptr<gtsam::ISAM2Clique> const& clique, std::size_t& n,
+    std::size_t& nnz) {
+  std::size_t const dimR = clique->conditional()->rows();
+  std::size_t const dimSep = clique->conditional()->S().cols();
+  n += dimR * dimR + dimSep * dimSep;
+  nnz += ((dimR + 1) * dimR) / 2 + dimSep * dimR;
+
+  for (auto const& child : clique->children) {
+    calculateStatsRec(child, n, nnz);
+  }
+}
+
+void GraphManager::calculateStats(
+    boost::shared_ptr<gtsam::ISAM2Clique> const& clique) {
+  std::size_t n = 0u, nnz = 0u;
+  calculateStatsRec(clique, n, nnz);
+  n_components_.emplace_back(n);
+  nnz_components_.emplace_back(nnz);
+}
+
 void GraphManager::updateGraphResults() {
+  auto const& logger = GraphManagerLogger::getInstance();
   if (graph_ == nullptr) {
-    const auto& logger = GraphManagerLogger::getInstance();
     logger.logError("GraphManager - Graph is nullptr, cannot update results.");
     return;
   }
@@ -450,11 +477,27 @@ void GraphManager::updateGraphResults() {
   // Update results
   gtsam::Values result;
   std::unordered_map<gtsam::Key, double> keyTimestampMap;
+  auto t1 = std::chrono::high_resolution_clock::now();
   {
     std::lock_guard<std::mutex> lock(graph_mutex_);
     result = graph_->calculateBestEstimate();
     keyTimestampMap =
         key_timestamp_map_;  // copy cost 36000 elements(10Hz * 1Hr) ~10ms
+    calculateStats(graph_->roots().front());
+  }
+  auto t2 = std::chrono::high_resolution_clock::now();
+
+  if (config_.verbose > 1) {
+    logger.logInfo(
+        "\033[36mGRAPH UPDATE\033[0m - time(ms):" +
+        std::to_string(
+            std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1)
+                .count()));
+    logger.logInfo(
+        "\033[36mGRAPH UPDATE\033[0m - factors: " +
+        std::to_string(factor_count_) +
+        " n_comps: " + std::to_string(n_components_.back()) +
+        " nnz_comps: " + std::to_string(nnz_components_.back()));
   }
 
   // Visualize results

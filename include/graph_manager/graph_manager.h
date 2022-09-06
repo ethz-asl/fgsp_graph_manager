@@ -111,6 +111,8 @@ class GraphManager {
       relative_parent_child_key_map_;  // Parent-Child keys for visualization of
                                        // relative constrinats
 
+  void calculateStats(boost::shared_ptr<gtsam::ISAM2Clique> const& clique);
+
   GraphManagerConfig const& config_;
   GraphManagerPublisher& publisher_;
   GraphManagerVisualizer& visualizer_;
@@ -120,6 +122,8 @@ class GraphManager {
   std::mutex relative_constraints_mutex_;
   std::vector<nav_msgs::msg::Path> anchor_constraints_buffer_;
   std::vector<nav_msgs::msg::Path> relative_constraints_buffer_;
+  std::vector<std::size_t> n_components_;
+  std::vector<std::size_t> nnz_components_;
 };
 
 }  // namespace fgsp
