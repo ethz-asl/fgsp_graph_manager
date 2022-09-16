@@ -34,6 +34,9 @@ class GraphManager {
   void bufferRelativeConstraints(nav_msgs::msg::Path const& path);
 
   void processConstraints();
+  void processAbsoluteConstraints(
+      std::vector<geometry_msgs::msg::PoseWithCovarianceStamped> const&
+          constraints);
   void processAnchorConstraints(
       std::vector<nav_msgs::msg::Path> const& constraints);
   void processRelativeConstraints(
@@ -126,10 +129,12 @@ class GraphManager {
   bool is_odom_degenerated_ = false;
 
   std::mutex anchor_constraints_mutex_;
-  std::mutex absolute_constraints_mutex_;
+  std::mutex absolute_reference_mutex_;
   std::mutex relative_constraints_mutex_;
   std::vector<nav_msgs::msg::Path> anchor_constraints_buffer_;
   std::vector<nav_msgs::msg::Path> relative_constraints_buffer_;
+  std::vector<geometry_msgs::msg::PoseWithCovarianceStamped>
+      absolute_reference_buffer_;
   std::vector<std::size_t> n_components_;
   std::vector<std::size_t> nnz_components_;
 };

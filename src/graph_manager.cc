@@ -153,13 +153,65 @@ void GraphManager::odometryCallback(nav_msgs::msg::Odometry const& odom) {
 
 void GraphManager::absoluteCallback(
     geometry_msgs::msg::PoseWithCovarianceStamped const& pose_stamped) {
-  const auto& logger = GraphManagerLogger::getInstance();
+  const std::lock_guard<std::mutex> lock(absolute_reference_mutex_);
+  absolute_reference_buffer_.emplace_back(pose_stamped);
+}
+
+void GraphManager::bufferAnchorConstraints(nav_msgs::msg::Path const& path) {
+  const std::lock_guard<std::mutex> lock(anchor_constraints_mutex_);
+  anchor_constraints_buffer_.emplace_back(path);
+}
+
+void GraphManager::bufferRelativeConstraints(nav_msgs::msg::Path const& path) {
+  const std::lock_guard<std::mutex> lock(relative_constraints_mutex_);
+  relative_constraints_buffer_.emplace_back(path);
+}
+
+void GraphManager::processConstraints() {
   if (first_odom_msg_) {
+    auto const& logger = GraphManagerLogger::getInstance();
     logger.logWarn(
-        "Received Absolute Pose Factor before the first odometry message.");
+        "Received No Odometry Messages, cannot add constraints to graph.");
     return;
   }
-  logger.logError("ABSOLUTE_____");
+
+  if (!absolute_reference_buffer_.empty()) {
+    std::vector<geometry_msgs::msg::PoseWithCovarianceStamped> absolute_refs;
+    {
+      const std::lock_guard<std::mutex> lock(absolute_reference_mutex_);
+      absolute_refs = absolute_reference_buffer_;
+      absolute_reference_buffer_.clear();
+    }
+    processAbsoluteConstraints(absolute_refs);
+  }
+
+  if (!anchor_constraints_buffer_.empty()) {
+    std::vector<nav_msgs::msg::Path> anchor_constraints;
+    {
+      const std::lock_guard<std::mutex> lock(anchor_constraints_mutex_);
+      anchor_constraints = anchor_constraints_buffer_;
+      anchor_constraints_buffer_.clear();
+    }
+    processAnchorConstraints(anchor_constraints);
+  }
+
+  if (!relative_constraints_buffer_.empty()) {
+    std::vector<nav_msgs::msg::Path> relative_constraints;
+    {
+      const std::lock_guard<std::mutex> lock(relative_constraints_mutex_);
+      relative_constraints = relative_constraints_buffer_;
+      relative_constraints_buffer_.clear();
+    }
+    processRelativeConstraints(relative_constraints);
+  }
+}
+
+void GraphManager::processAbsoluteConstraints(
+    std::vector<geometry_msgs::msg::PoseWithCovarianceStamped> const& refs) {
+  auto const& logger = GraphManagerLogger::getInstance();
+
+  // TODO(lbern): Average over the references.
+  auto const pose_stamped = refs.back();
 
   // Get T_G_C i.e. Camera(C) pose in Global(G)
   geometry_msgs::msg::Pose const& p = pose_stamped.pose.pose;
@@ -215,38 +267,6 @@ void GraphManager::absoluteCallback(
        << std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1)
               .count();
     logger.logInfo(ss.str());
-  }
-}
-
-void GraphManager::bufferAnchorConstraints(nav_msgs::msg::Path const& path) {
-  const std::lock_guard<std::mutex> lock(anchor_constraints_mutex_);
-  anchor_constraints_buffer_.emplace_back(path);
-}
-
-void GraphManager::bufferRelativeConstraints(nav_msgs::msg::Path const& path) {
-  const std::lock_guard<std::mutex> lock(relative_constraints_mutex_);
-  relative_constraints_buffer_.emplace_back(path);
-}
-
-void GraphManager::processConstraints() {
-  if (!anchor_constraints_buffer_.empty()) {
-    std::vector<nav_msgs::msg::Path> anchor_constraints;
-    {
-      const std::lock_guard<std::mutex> lock(anchor_constraints_mutex_);
-      anchor_constraints = anchor_constraints_buffer_;
-      anchor_constraints_buffer_.clear();
-    }
-    processAnchorConstraints(anchor_constraints);
-  }
-
-  if (!relative_constraints_buffer_.empty()) {
-    std::vector<nav_msgs::msg::Path> relative_constraints;
-    {
-      const std::lock_guard<std::mutex> lock(relative_constraints_mutex_);
-      relative_constraints = relative_constraints_buffer_;
-      relative_constraints_buffer_.clear();
-    }
-    processRelativeConstraints(relative_constraints);
   }
 }
 
