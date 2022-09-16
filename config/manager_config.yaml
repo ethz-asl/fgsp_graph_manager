@@ -7,6 +7,7 @@ graph_manager:
     odom_noise_std: [0.05, 0.05, 0.05, 0.1, 0.1, 0.1] # Noise of Odometry factors - ORDER RPY(rad) - XYZ(m)
     relative_noise_std: [1.0e-03, 1.0e-03, 1.0e-03, 1.0e-03, 1.0e-03, 1.0e-03] # Noise of relative factors - ORDER RPY(rad) - XYZ(m)
     anchor_noise_std: [1.0e-05, 1.0e-05, 1.0e-05, 1.0e-05, 1.0e-05, 1.0e-05] # Noise of anchor factors - ORDER RPY(rad) - XYZ(m)
+    absolute_noise_std: [1.0e-06, 1.0e-06, 1.0e-06, 1.0e-06, 1.0e-06, 1.0e-06] # Noise of anchor factors - ORDER RPY(rad) - XYZ(m)
 
     update_interval_ms: 5000 # Interval(ms) at which graph is optimized
     approximate_ts_lookup: false
@@ -27,6 +28,25 @@ graph_manager:
         0.0,
         1.0,
         0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+      ]
+    T_B_A:
+      [
+        -0.99992301,
+        -0.010734,
+        -0.00622593,
+        0.04516522,
+        0.00619948,
+        0.0024954,
+        -0.99997767,
+        -0.07367545,
+        0.0107493,
+        -0.99993928,
+        -0.00242867,
+        0.02526507,
         0.0,
         0.0,
         0.0,

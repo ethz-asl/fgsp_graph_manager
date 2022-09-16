@@ -40,6 +40,8 @@ GraphManagerConfig* GraphManagerConfig::init(rclcpp::Node& node) {
       parser.get_parameter("relative_noise_std", config->relative_noise_std);
   config->anchor_noise_std =
       parser.get_parameter("anchor_noise_std", config->anchor_noise_std);
+  config->absolute_noise_std =
+      parser.get_parameter("absolute_noise_std", config->absolute_noise_std);
 
   // Topics
   config->odom_topic = parser.get_parameter("odom_topic", config->odom_topic);
@@ -55,6 +57,7 @@ GraphManagerConfig* GraphManagerConfig::init(rclcpp::Node& node) {
       parser.get_parameter("ts_lookup_threshold", config->ts_lookup_threshold);
 
   config->T_O_B = parser.get_parameter("T_O_B", config->T_O_B);
+  config->T_B_A = parser.get_parameter("T_O_B", config->T_O_B);
 
   return config;
 }
