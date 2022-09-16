@@ -49,6 +49,8 @@ GraphManagerConfig* GraphManagerConfig::init(rclcpp::Node& node) {
       parser.get_parameter("anchor_topic", config->anchor_topic);
   config->relative_topic =
       parser.get_parameter("relative_topic", config->relative_topic);
+  config->absolute_topic =
+      parser.get_parameter("absolute_topic", config->absolute_topic);
   config->update_interval_ms =
       parser.get_parameter("update_interval_ms", config->update_interval_ms);
   config->approximate_ts_lookup = parser.get_parameter(
@@ -57,7 +59,7 @@ GraphManagerConfig* GraphManagerConfig::init(rclcpp::Node& node) {
       parser.get_parameter("ts_lookup_threshold", config->ts_lookup_threshold);
 
   config->T_O_B = parser.get_parameter("T_O_B", config->T_O_B);
-  config->T_B_A = parser.get_parameter("T_O_B", config->T_O_B);
+  config->T_B_A = parser.get_parameter("T_B_A", config->T_B_A);
 
   return config;
 }

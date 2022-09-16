@@ -24,5 +24,7 @@ class GraphManagerNode : public rclcpp::Node {
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
   rclcpp::Subscription<nav_msgs::msg::Path>::SharedPtr anchor_sub_;
   rclcpp::Subscription<nav_msgs::msg::Path>::SharedPtr relative_sub_;
+  rclcpp::Subscription<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr
+      absolute_sub_;
   rclcpp::TimerBase::SharedPtr timer_;
 };

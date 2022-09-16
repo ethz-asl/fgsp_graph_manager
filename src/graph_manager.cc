@@ -156,9 +156,10 @@ void GraphManager::absoluteCallback(
   const auto& logger = GraphManagerLogger::getInstance();
   if (first_odom_msg_) {
     logger.logWarn(
-        "MaplabIntegrator - nullptr passed to Absolute Pose Factor callback");
+        "Received Absolute Pose Factor before the first odometry message.");
     return;
   }
+  logger.logError("ABSOLUTE_____");
 
   // Get T_G_C i.e. Camera(C) pose in Global(G)
   geometry_msgs::msg::Pose const& p = pose_stamped.pose.pose;

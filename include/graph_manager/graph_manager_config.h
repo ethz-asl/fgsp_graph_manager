@@ -22,6 +22,7 @@ struct GraphManagerConfig {
   std::string odom_topic = "/odometry";
   std::string anchor_topic = "/graph_client/anchor_nodes";
   std::string relative_topic = "/graph_client/relative_nodes";
+  std::string absolute_topic = "/anymal/absolute_reference";
   int update_interval_ms = 10000;      // Graph optimization interval (ms)
   bool approximate_ts_lookup = false;  // Use approximate time lookup
   double ts_lookup_threshold = 0.1;    // Time lookup threshold (s)
