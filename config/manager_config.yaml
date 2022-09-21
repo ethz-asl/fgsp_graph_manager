@@ -1,6 +1,6 @@
 graph_manager:
   ros__parameters:
-    verbose: 2 # Verbosity level (0:quiet)
+    verbose: 3 # Verbosity level (0:quiet)
 
     map_frame: map # Robot Map frame
 

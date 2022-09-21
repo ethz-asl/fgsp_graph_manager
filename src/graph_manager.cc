@@ -210,7 +210,7 @@ void GraphManager::processAbsoluteConstraints(
     std::vector<geometry_msgs::msg::PoseWithCovarianceStamped> const& refs) {
   auto const& logger = GraphManagerLogger::getInstance();
 
-  // TODO(lbern): Average over the references.
+  // TODO(lbern): Average over the references or make a proper sync.
   auto const pose_stamped = refs.back();
 
   // Get T_G_C i.e. Camera(C) pose in Global(G)
@@ -410,7 +410,7 @@ void GraphManager::processRelativeConstraints(
         logger.logInfo(
             "\033[34mRELATIVE\033[0m  - Found no key for parent at ts: " +
             std::to_string(parent_ts) + " --- SKIPPING CHILDERN ---");
-      return;
+      continue;
     }
 
     // Loop through relative(parent)-relative(child) constraints
