@@ -48,6 +48,13 @@ GraphManagerNode::GraphManagerNode() : rclcpp::Node("graph_manager") {
           &fgsp::GraphManager::bufferRelativeConstraints, manager_.get(),
           std::placeholders::_1));
 
+  absolute_sub_ =
+      create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>(
+          config_->absolute_topic, qos,
+          std::bind(
+              &fgsp::GraphManager::absoluteCallback, manager_.get(),
+              std::placeholders::_1));
+
   timer_ = create_wall_timer(
       std::chrono::milliseconds(config_->update_interval_ms),
       std::bind(&fgsp::GraphManager::updateGraphResults, manager_.get()));

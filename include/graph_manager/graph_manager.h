@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
 #include <nav_msgs/msg/odometry.hpp>
 #include <nav_msgs/msg/path.hpp>
 
@@ -27,10 +28,15 @@ class GraphManager {
       GraphManagerVisualizer& visualizer);
 
   void odometryCallback(nav_msgs::msg::Odometry const& odom);
+  void absoluteCallback(
+      geometry_msgs::msg::PoseWithCovarianceStamped const& pose_stamped);
   void bufferAnchorConstraints(nav_msgs::msg::Path const& path);
   void bufferRelativeConstraints(nav_msgs::msg::Path const& path);
 
   void processConstraints();
+  void processAbsoluteConstraints(
+      std::vector<geometry_msgs::msg::PoseWithCovarianceStamped> const&
+          constraints);
   void processAnchorConstraints(
       std::vector<nav_msgs::msg::Path> const& constraints);
   void processRelativeConstraints(
@@ -70,6 +76,8 @@ class GraphManager {
   auto getFactorCount() -> std::size_t { return factor_count_; }
 
   gtsam::Pose3 T_O_B_;      // Base(B) to Odometry(O)
+  gtsam::Pose3 T_B_A_;      // Absolute Reference (A) to Odometry(O)
+  gtsam::Pose3 T_G_M_;      // Global(B) to Map(M)
   gtsam::Pose3 T_M_B_inc_;  // Base(B) to Map(M) - incremental
 
   // Factor graph
@@ -84,9 +92,11 @@ class GraphManager {
   gtsam::Vector6 odom_noise_;      // Odometry BetweenFactor Noise
   gtsam::Vector6 relative_noise_;  // Relatve BetweenFactor Noise
   gtsam::Vector6 anchor_noise_;    // Anchor PriorFactor Noise
+  gtsam::Vector6 absolute_noise_;  // Anchor PriorFactor Noise
 
   // Odometry factor
   bool first_odom_msg_ = true;
+  bool first_absolute_pose_ = true;
   gtsam::Pose3 last_Base_pose_;
 
   // Lookup map objects for key-to-factorIndex associations
@@ -119,9 +129,12 @@ class GraphManager {
   bool is_odom_degenerated_ = false;
 
   std::mutex anchor_constraints_mutex_;
+  std::mutex absolute_reference_mutex_;
   std::mutex relative_constraints_mutex_;
   std::vector<nav_msgs::msg::Path> anchor_constraints_buffer_;
   std::vector<nav_msgs::msg::Path> relative_constraints_buffer_;
+  std::vector<geometry_msgs::msg::PoseWithCovarianceStamped>
+      absolute_reference_buffer_;
   std::vector<std::size_t> n_components_;
   std::vector<std::size_t> nnz_components_;
 };

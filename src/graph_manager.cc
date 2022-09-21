@@ -40,6 +40,8 @@ GraphManager::GraphManager(
       config.relative_noise_std.data());
   anchor_noise_ = Eigen::Map<const Eigen::Matrix<double, 6, 1>>(
       config.anchor_noise_std.data());
+  absolute_noise_ = Eigen::Map<const Eigen::Matrix<double, 6, 1>>(
+      config.absolute_noise_std.data());
 
   // TODO(lbern): Move to logger
   Eigen::IOFormat clean_fmt(4, 0, ", ", "\n", "[", "]");
@@ -49,13 +51,19 @@ GraphManager::GraphManager(
      << "GraphManager - Relative factor noise: "
      << relative_noise_.transpose().format(clean_fmt) << "\n"
      << "GraphManager - Anchor factor noise: "
-     << anchor_noise_.transpose().format(clean_fmt) << "\n";
+     << anchor_noise_.transpose().format(clean_fmt) << "\n"
+     << "GraphManager - Absolute factor noise: "
+     << absolute_noise_.transpose().format(clean_fmt) << "\n";
   logger.logInfo(ss.str());
 
   auto T_O_B =
       Eigen::Map<const Eigen::Matrix<double, 4, 4>>(config.T_O_B.data());
   T_O_B_ = gtsam::Pose3(
       gtsam::Rot3(T_O_B.block(0, 0, 3, 3)), T_O_B.block(0, 3, 3, 1));
+  auto T_B_A =
+      Eigen::Map<const Eigen::Matrix<double, 4, 4>>(config.T_B_A.data());
+  T_B_A_ = gtsam::Pose3(
+      gtsam::Rot3(T_B_A.block(0, 0, 3, 3)), T_B_A.block(0, 3, 3, 1));
 
   // Set factor graph params
   params_.optimizationParams = gtsam::ISAM2GaussNewtonParams();
@@ -143,6 +151,12 @@ void GraphManager::odometryCallback(nav_msgs::msg::Odometry const& odom) {
   }
 }
 
+void GraphManager::absoluteCallback(
+    geometry_msgs::msg::PoseWithCovarianceStamped const& pose_stamped) {
+  const std::lock_guard<std::mutex> lock(absolute_reference_mutex_);
+  absolute_reference_buffer_.emplace_back(pose_stamped);
+}
+
 void GraphManager::bufferAnchorConstraints(nav_msgs::msg::Path const& path) {
   const std::lock_guard<std::mutex> lock(anchor_constraints_mutex_);
   anchor_constraints_buffer_.emplace_back(path);
@@ -154,6 +168,23 @@ void GraphManager::bufferRelativeConstraints(nav_msgs::msg::Path const& path) {
 }
 
 void GraphManager::processConstraints() {
+  if (first_odom_msg_) {
+    auto const& logger = GraphManagerLogger::getInstance();
+    logger.logWarn(
+        "Received No Odometry Messages, cannot add constraints to graph.");
+    return;
+  }
+
+  if (!absolute_reference_buffer_.empty()) {
+    std::vector<geometry_msgs::msg::PoseWithCovarianceStamped> absolute_refs;
+    {
+      const std::lock_guard<std::mutex> lock(absolute_reference_mutex_);
+      absolute_refs = absolute_reference_buffer_;
+      absolute_reference_buffer_.clear();
+    }
+    processAbsoluteConstraints(absolute_refs);
+  }
+
   if (!anchor_constraints_buffer_.empty()) {
     std::vector<nav_msgs::msg::Path> anchor_constraints;
     {
@@ -172,6 +203,70 @@ void GraphManager::processConstraints() {
       relative_constraints_buffer_.clear();
     }
     processRelativeConstraints(relative_constraints);
+  }
+}
+
+void GraphManager::processAbsoluteConstraints(
+    std::vector<geometry_msgs::msg::PoseWithCovarianceStamped> const& refs) {
+  auto const& logger = GraphManagerLogger::getInstance();
+
+  // TODO(lbern): Average over the references or make a proper sync.
+  auto const pose_stamped = refs.back();
+
+  // Get T_G_C i.e. Camera(C) pose in Global(G)
+  geometry_msgs::msg::Pose const& p = pose_stamped.pose.pose;
+  gtsam::Pose3 const T_G_A(
+      gtsam::Rot3(
+          p.orientation.w, p.orientation.x, p.orientation.y, p.orientation.z),
+      gtsam::Point3(p.position.x, p.position.y, p.position.z));
+  // Calculate IMU(B) pose in Global(G)
+  gtsam::Pose3 T_G_B = T_G_A * T_B_A_.inverse();
+
+  // Add absolute priors at FIRST key i.e. key=0
+  auto t1 = std::chrono::high_resolution_clock::now();
+  {
+    std::lock_guard<std::mutex> lock(graph_mutex_);
+    // Create prior factor
+    static auto absoluteNoise =
+        gtsam::noiseModel::Diagonal::Sigmas(absolute_noise_);
+    new_factors_.emplace_shared<gtsam::PriorFactor<gtsam::Pose3>>(
+        X(0), T_G_B, absoluteNoise);
+
+    // If first aboslute pose - remove any previous priors at FIRST key
+    gtsam::FactorIndices remove_factor_idx;
+    if (first_absolute_pose_) {
+      remove_factor_idx.emplace_back(0);
+      first_absolute_pose_ = false;
+      logger.logInfo(
+          "\033[33mABSOLUTE\033[0m First ABSOLUTE POSE received removing old "
+          "absolute pose");
+    }
+
+    // Update graph
+    graph_->update(new_factors_, gtsam::Values(), remove_factor_idx);
+    new_factors_.resize(0);
+
+    // Increment total factor count
+    incFactorCount();
+  }
+  auto t2 = std::chrono::high_resolution_clock::now();
+
+  // // Visualization markers
+  // geometry_msgs::msg::Point mPt;
+  // mPt.x = T_G_B.translation().x();
+  // mPt.y = T_G_B.translation().y();
+  // mPt.z = T_G_B.translation().z();
+  // _absoluteMarkerMsg.points.emplace_back(mPt);
+
+  if (config_.verbose > 2) {
+    std::stringstream ss;
+    ss << "\033[33mABSOLUTE\033[0m"
+       << ", T_G_M t(m): " << T_G_M_.translation().transpose()
+       << ", RPY(deg): " << T_G_M_.rotation().rpy().transpose() * (180.0 / M_PI)
+       << ", time(ms): "
+       << std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1)
+              .count();
+    logger.logInfo(ss.str());
   }
 }
 
@@ -315,7 +410,7 @@ void GraphManager::processRelativeConstraints(
         logger.logInfo(
             "\033[34mRELATIVE\033[0m  - Found no key for parent at ts: " +
             std::to_string(parent_ts) + " --- SKIPPING CHILDERN ---");
-      return;
+      continue;
     }
 
     // Loop through relative(parent)-relative(child) constraints
@@ -486,6 +581,7 @@ void GraphManager::updateGraphResults() {
     calculateStats(graph_->roots().front());
   }
   auto t2 = std::chrono::high_resolution_clock::now();
+  T_G_M_ = result.at<gtsam::Pose3>(X(0));
 
   if (config_.verbose > 1) {
     logger.logInfo(
