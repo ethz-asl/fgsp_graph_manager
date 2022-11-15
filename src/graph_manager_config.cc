@@ -55,8 +55,8 @@ GraphManagerConfig* GraphManagerConfig::init(rclcpp::Node& node) {
       parser.get_parameter("update_interval_ms", config->update_interval_ms);
   config->approximate_ts_lookup = parser.get_parameter(
       "approximate_ts_lookup", config->approximate_ts_lookup);
-  config->ts_lookup_threshold =
-      parser.get_parameter("ts_lookup_threshold", config->ts_lookup_threshold);
+  config->ts_lookup_threshold_s = parser.get_parameter(
+      "ts_lookup_threshold_s", config->ts_lookup_threshold_s);
 
   config->T_O_B = parser.get_parameter("T_O_B", config->T_O_B);
   config->T_B_A = parser.get_parameter("T_B_A", config->T_B_A);

@@ -25,7 +25,7 @@ struct GraphManagerConfig {
   std::string absolute_topic = "/anymal/absolute_reference";
   int update_interval_ms = 10000;      // Graph optimization interval (ms)
   bool approximate_ts_lookup = false;  // Use approximate time lookup
-  double ts_lookup_threshold = 0.1;    // Time lookup threshold (s)
+  double ts_lookup_threshold_s = 0.1;  // Time lookup threshold (s)
 
   // Extrinsic calibrations
   std::vector<double> T_O_B = {1.0, 0.0, 0.0, 0.0, 0.0, 1.0,

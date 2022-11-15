@@ -676,7 +676,7 @@ auto GraphManager::findClosestKeyForTs(double ts, gtsam::Key* key) const
   }
 
   *key = it->second;
-  double const& eps = config_.ts_lookup_threshold * 1e9;
+  double const& eps = config_.ts_lookup_threshold_s * 1e9;
   auto ts_diff = std::abs(ts - it->first);
   return ts_diff < eps;
 }
