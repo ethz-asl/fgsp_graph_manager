@@ -17,7 +17,7 @@ def generate_launch_description():
     manager_node = Node(
         package="graph_manager",
         executable="graph_manager_node",
-        output={'full': 'screen'},
+        output={'both': 'screen'},
         emulate_tty=True,
         parameters=[config, {'use_sim_time': True}],
     )
